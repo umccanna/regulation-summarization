@@ -1,0 +1,4 @@
+pdfplumber
+openai
+python-dotenv
+azure-cosmos
