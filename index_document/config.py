@@ -19,6 +19,10 @@ __configuration = {
         "COSMOS_DB_KEY": "",
         "DATABASE_NAME": "summarizations",
         "CONTAINER_NAME": "pricingregulations",
+        "ChunkSize": 20,
+        "Overlap": 5,
+        "ChunkingCharacter":".",
+        "SpoolingSize": 50
     }
 }
 
