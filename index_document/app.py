@@ -5,6 +5,8 @@ from openai import AzureOpenAI
 from azure.cosmos import CosmosClient, ContainerProxy
 import psutil
 import os
+import getopt
+import sys
 
 def normalize_text(text: str):
     text = re.sub(r'\s+',  ' ', text).strip()
@@ -53,7 +55,7 @@ def search_embeddings(embedding: list[float], model_type):
     container = get_cosmos_container()
     items = []
     for item in container.query_items(
-        query="SELECT TOP 10 c.id, c.modelType, c.text, c.pageIndex, c.documentType, VectorDistance(c.vector, @embedding) as similiarityScore FROM c ORDER BY VectorDistance(c.vector, @embedding)",
+        query="SELECT TOP 20 c.id, c.modelType, c.text, c.pageIndex, c.documentType, VectorDistance(c.vector, @embedding) as similiarityScore FROM c ORDER BY VectorDistance(c.vector, @embedding)",
         parameters=[dict(
             name="@embedding", value=embedding
         )],
@@ -197,8 +199,6 @@ def overlap_and_upload_chunks(cosmos_container, chunk_accumulator, overlap_size,
 
 
 def query_embeddings(query: str):
-    print('Querying Fact Sheet')
-
     openai_client = AzureOpenAI(
         api_key = get_config("AZURE_OPENAI_API_KEY"),
         api_version = "2024-02-01",
@@ -220,12 +220,75 @@ def query_embeddings(query: str):
 
     if len(results) == 0:
         print('No matches found')
-    else:
-        for r in results:
-            print(f'document: {r["documentType"]}, similarityScore: {r["similiarityScore"]}, text: {r["text"]}')
+        return []
+    
+    return results
+
+def prompt_open_ai(embeddings: list[str], query: str):
+    openai_client = AzureOpenAI(
+        api_key = get_config("AZURE_OPENAI_API_KEY"),
+        api_version = "2024-02-01",
+        azure_endpoint = get_config("AZURE_OPENAI_ENDPOINT")
+    )
+
+    context = " ".join(embeddings)
+
+    chat_completion = openai_client.chat.completions.create(
+        messages=[
+            {
+                "role": "user",
+                "content": f'''
+                    You are a CMS Regulation Analyst that analyzes pricing regulations and provides concise and accurate responses.  
+                    Only provide responses that can be found in the provided "Context:" based on the user's "Prompt:".  If you are unable to find a response in the provided context do not make anything up.  Just response with "I'm not sure".
+
+                    Prompt:
+                    {query}
+
+                    Context:
+                    {context}
+                ''',
+            }
+        ],
+        model=get_config("ChatModel")
+    )
+
+    print(chat_completion.choices[0].message.content)
+
+def main():
+    try:
+        opts, _ = getopt.getopt(sys.argv[1:], "q:", ["query="])
+    except getopt.GetoptError:
+        print_help()
+        sys.exit(2)
+        
+    if requesting_help(opts):
+        print_help()
+        sys.exit(0)
+
+    query = get_value(opts, '-q')
+    if query == None:
+        print('No query provided.  Please provide a query to begin')
+        print_help()
+        sys.exit(2)
+
+    embeddings = query_embeddings(query)
+    if len(embeddings) == 0:
+        print('We are unable to complete your request at this time')
+        sys.exit(0)
+    
+    prompt_open_ai([e["text"] for e in embeddings], query)
 
 
-#upload_fact_sheet()
-#query_embeddings("What are the high level updates come with this regulation change?")
-upload_final_ruling()
-            
+def requesting_help(opts):
+    help = next((o for o in opts if len(o) > 0 and o[0] == '-h'), None)
+    return help != None
+
+def print_help():
+    print('You need help...')
+    
+def get_value(opts, parameter):
+    value_arg = next((o for o in opts if len(o) > 0 and o[0] == parameter and len(o) == 2), None)
+    return value_arg[1] if value_arg != None else None
+
+if __name__ == "__main__":
+	sys.exit(main())
