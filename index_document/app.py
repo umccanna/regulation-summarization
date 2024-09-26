@@ -329,8 +329,8 @@ def prompt_open_ai_with_embeddings(embeddings: list[str], query: str):
     new_user_message = {
                 "role": "user",
                 "content": f'''
-                    Only provide responses that can be found in the below "Context:" or from "Context:" in their previous messages based on the user's "Prompt:".  
-                    If you are unable to find a response in the below context or previous "Context:" do not make anything up.  Just response with "I'm not sure".
+                    Only provide responses that can be found "Context:" provided below or from the "Context:" in previous messages based on the user's "Prompt:".  
+                    If you are unable to find a response in the below "Context:" or previous "Context:" do not make anything up.  Just response with "I'm not sure".
 
                     Prompt:
                     {query}
@@ -374,9 +374,17 @@ def prompt_open_ai(query: str):
     for message in historical_messages:
         messages.append(message)
 
+    
+
     new_user_message = {
                 "role": "user",
-                "content": query,
+                "content": f'''
+                    Only provide responses that can be found in the "Context:" of previous messages based on the user's "Prompt:".  
+                    If you are unable to find a response in the below "Context:" or previous "Context:" do not make anything up.  Just response with "I'm not sure".
+
+                    Prompt:
+                    {query}
+                ''',
             }
 
     messages.append(new_user_message)    

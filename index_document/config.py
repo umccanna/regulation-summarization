@@ -15,7 +15,7 @@ __configuration = {
         "AZURE_OPENAI_ENDPOINT": "https://seattlehealth-openai.openai.azure.com/",
         "AZURE_OPENAI_API_KEY": "",
         "EmbeddingsModel": "seattlehealth-embeddings-small",
-        "ChatModel": "seattlehealth-gpt-4o-mini-default",
+        "ChatModel": "seattlehealth-gpt-4o",
         "COSMOS_DB_URL": "https://seattlehealth-cdb-ai.documents.azure.com:443/",
         "COSMOS_DB_KEY": "",
         "DATABASE_NAME": "summarizations",
