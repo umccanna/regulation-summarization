@@ -11,6 +11,7 @@ import json
 def normalize_text(text: str):
     text = re.sub(r'\s+',  ' ', text).strip()
     text = re.sub(r". ,","",text)
+    text = re.sub(r"\\u(?:[a-z]|\d){4}", "", text)
     # remove all instances of multiple spaces
     text = text.replace("..",".")
     text = text.replace(". .",".")
@@ -233,26 +234,26 @@ def should_pull_more_embeddings(query: str):
     
     print(f'Initial embeddings question response "{decision}"')
 
-    messages.append({
-        "role": "assistant",
-        "content": decision
-    })
+    # messages.append({
+    #     "role": "assistant",
+    #     "content": decision
+    # })
 
-    messages.append({
-        "role": "user",
-        "content": '''Could you double check your previous response and verify that it was correct? If it was correct, echo the exact response.  Otherwise provide the correct response. Only response with a "yes" or "no".
+    # messages.append({
+    #     "role": "user",
+    #     "content": '''Could you double check your previous response and verify that it was correct? If it was correct, echo the exact response.  Otherwise provide the correct response. Only response with a "yes" or "no".
 
-            You Previous Answer: {decision}'''
-    })
+    #         You Previous Answer: {decision}'''
+    # })
 
-    chat_completion = openai_client.chat.completions.create(
-        messages=messages,
-        model=get_config("ChatModel")
-    )
+    # chat_completion = openai_client.chat.completions.create(
+    #     messages=messages,
+    #     model=get_config("ChatModel")
+    # )
     
-    decision = chat_completion.choices[0].message.content
+    # decision = chat_completion.choices[0].message.content
 
-    print(f'Checked embeddings question response "{decision}"')
+    # print(f'Checked embeddings question response "{decision}"')
 
     return decision.lower().strip() == 'yes'
 
