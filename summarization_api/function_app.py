@@ -46,6 +46,11 @@ def ClearHistoryAPI(req: func.HttpRequest) -> func.HttpResponse:
 
 def handle_query(query: str):
     try:
+        should_include_fact_sheet = should_pull_fact_sheet(query)
+        fact_sheet = []
+        if should_include_fact_sheet:
+            fact_sheet = get_fact_sheet()
+
         # Based on CLI's main function logic
         should_get_embeddings = should_pull_more_embeddings(query)
         if should_get_embeddings:
@@ -53,9 +58,9 @@ def handle_query(query: str):
             if len(embeddings) == 0:
                 logging.error("No matches found in vector database.")
                 return None
-            response = prompt_open_ai_with_embeddings([e["text"] for e in embeddings], query)
+            response = prompt_open_ai_with_embeddings(fact_sheet, [e["text"] for e in embeddings], query)
         else:
-            response = prompt_open_ai(query)
+            response = prompt_open_ai(fact_sheet, query)
 
         return {"result": response}
 
@@ -99,7 +104,7 @@ def search_embeddings(embedding: list[float], model_type):
     container = get_cosmos_container()
     items = []
     for item in container.query_items(
-        query="SELECT TOP 15 c.id, c.modelType, c.text, c.pageIndex, c.documentType, VectorDistance(c.vector, @embedding) as similiarityScore FROM c ORDER BY VectorDistance(c.vector, @embedding)",
+        query="SELECT TOP 10 c.id, c.modelType, c.text, c.pageIndex, c.documentType, VectorDistance(c.vector, @embedding) as similiarityScore FROM c ORDER BY VectorDistance(c.vector, @embedding)",
         parameters=[dict(
             name="@embedding", value=embedding
         )],
@@ -113,6 +118,50 @@ def search_embeddings(embedding: list[float], model_type):
             "similiarityScore": item["similiarityScore"]
         })
     return items
+
+def should_pull_fact_sheet(query: str):
+    historical_messages = get_history()
+    if len(historical_messages) == 0:
+        return True
+    
+    openai_client = AzureOpenAI(
+        api_key = get_config("AZURE_OPENAI_API_KEY"),
+        api_version = "2024-02-01",
+        azure_endpoint = get_config("AZURE_OPENAI_ENDPOINT")
+    )
+    
+    messages = []
+
+    messages.append({
+        "role": "system",
+        "content": get_system_prompt()
+    })
+    
+    for message in historical_messages:
+        messages.append(message)
+
+    messages.append({
+        "role": "user",
+        "content": f'''
+            Only provide a simple "yes" or "no" in response to this question.  Always respond in all lower case. 
+
+            I have a high level summary of all the changes that are included in this data. Based on the below "Prompt", is the user asking for a general list of changes?
+            Please be very careful in how you respond and verify that the answer is the correct answer based on the conversaion history.  
+            I would only want to include this summary if it was not included recently in the conversation history and only if the user is specifically asking for a changes.
+
+            Prompt:
+            {query}
+        ''',
+    })  
+
+    chat_completion = openai_client.chat.completions.create(
+        messages=messages,
+        model=get_config("ChatModel")
+    )
+
+    decision = chat_completion.choices[0].message.content
+
+    return decision.lower().strip() == 'yes'
 
 def should_pull_more_embeddings(query: str):
 
@@ -155,11 +204,29 @@ def should_pull_more_embeddings(query: str):
     )
 
     decision = chat_completion.choices[0].message.content
-    
-    #print(f'Initial embeddings question response "{decision}"')
-
 
     return decision.lower().strip() == 'yes'
+
+def get_fact_sheet():
+    
+    year = get_config("Year")
+    model = get_config("Model")
+    container = get_cosmos_container()
+    items = []
+    for item in container.query_items(
+        query="SELECT TOP 15 c.id, c.modelType, c.text, c.pageIndex, c.documentType FROM c WHERE c.documentType = 'FactSheet' ORDER BY c.pageIndex ASC",
+        parameters=[],
+        partition_key=f'{model}_{year}'
+    ):
+        items.append({
+            "id": item["id"],
+            "modelType": item["modelType"],
+            "text": item["text"],
+            "documentType": item["documentType"]
+        })
+
+    print('found fact sheet items', len(items))
+    return items
 
 def query_embeddings(query: str):
     openai_client = AzureOpenAI(
@@ -209,12 +276,13 @@ def add_to_history(new_convo):
         history_json = json.dumps(existing_history)
         convo_writer.write(history_json)
 
-def prompt_open_ai_with_embeddings(embeddings: list[str], query: str):
+def prompt_open_ai_with_embeddings(fact_sheet_parts: list[str], embeddings: list[str], query: str):
     openai_client = AzureOpenAI(
         api_key = get_config("AZURE_OPENAI_API_KEY"),
         api_version = "2024-02-01",
         azure_endpoint = get_config("AZURE_OPENAI_ENDPOINT")
     )
+
 
     context = " ".join(embeddings)
 
@@ -230,17 +298,28 @@ def prompt_open_ai_with_embeddings(embeddings: list[str], query: str):
     for message in historical_messages:
         messages.append(message)
 
+    fact_sheet = " ".join(fact_sheet_parts)
+    fact_sheet_prompt = ''
+    if len(fact_sheet_parts) > 0:
+        fact_sheet_prompt = f'''
+            Fact Sheet:
+            {fact_sheet}
+        '''
+
     new_user_message = {
                 "role": "user",
                 "content": f'''
                     Only provide responses that can be found "Context:" provided below or from the "Context:" in previous messages based on the user's "Prompt:".  
                     If you are unable to find a response in the below "Context:" or previous "Context:" do not make anything up.  Just response with "I'm not sure".
+                    If a "Fact Sheet:" is provided use that content to inform and focus the response. 
 
                     Prompt:
                     {query}
 
                     Context:
                     {context}
+
+                    {fact_sheet_prompt}
                 ''',
             }
 
@@ -260,7 +339,7 @@ def prompt_open_ai_with_embeddings(embeddings: list[str], query: str):
 
     return chat_completion.choices[0].message.content
 
-def prompt_open_ai(query: str):
+def prompt_open_ai(fact_sheet_parts: list[str], query: str):
     openai_client = AzureOpenAI(
         api_key = get_config("AZURE_OPENAI_API_KEY"),
         api_version = "2024-02-01",
@@ -279,14 +358,25 @@ def prompt_open_ai(query: str):
     for message in historical_messages:
         messages.append(message)    
 
+    fact_sheet = " ".join(fact_sheet_parts)
+    fact_sheet_prompt = ''
+    if len(fact_sheet_parts) > 0:
+        fact_sheet_prompt = f'''
+            Fact Sheet:
+            {fact_sheet}
+        '''
+
     new_user_message = {
                 "role": "user",
                 "content": f'''
                     Only provide responses that can be found in the "Context:" of previous messages based on the user's "Prompt:".  
                     If you are unable to find a response in the below "Context:" or previous "Context:" do not make anything up.  Just response with "I'm not sure".
+                    If a "Fact Sheet:" is provided use that content to inform and focus the response. 
 
                     Prompt:
                     {query}
+
+                    {fact_sheet_prompt}
                 ''',
             }
 

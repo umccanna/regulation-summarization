@@ -60,6 +60,7 @@ def upload_fact_sheet():
     )
 
     fact_sheet = get_config("FactSheetLocation")
+    
     with pdfplumber.open(fact_sheet) as pdf:
         for i, page in enumerate(pdf.pages):
             page_text = page.extract_text()
@@ -110,8 +111,6 @@ def upload_final_ruling():
                 print(f'Skipping page {i+1}')
                 continue
 
-
-            text_accumulator.append(f'Page {i+1}')
             for text in normalized_page_text.split(chunking_character):
                 text_accumulator.append(f'<Page {i+1}>{text}</Page {i+1}>')
                 if len(text_accumulator) > chunk_size:
