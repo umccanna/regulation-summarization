@@ -1,6 +1,3 @@
-import azure.functions as func
-import datetime
-import logging
 from config import get_config
 import re
 from openai import AzureOpenAI
@@ -10,59 +7,6 @@ import sys
 from pathlib import Path 
 import json
 
-app = func.FunctionApp()
-
-@app.route(route="summarize", auth_level=func.AuthLevel.ANONYMOUS)
-def SummarizationAPI(req: func.HttpRequest) -> func.HttpResponse:
-    
-    query = req.params.get('query')
-
-    if not query:
-        return func.HttpResponse(
-            "Please pass a query parameter either in the query string or request body.",
-            status_code=400
-        )
-
-    # Integrate the CLI logic
-    response_content = handle_query(query)
-
-    if response_content:
-        return func.HttpResponse(
-            json.dumps(response_content),
-            status_code=200,
-            mimetype="application/json"
-        )
-    else:
-        return func.HttpResponse(
-            "We are unable to complete your request at this time.",
-            status_code=500
-        )
-    
-@app.route(route="clear", auth_level=func.AuthLevel.ANONYMOUS)
-def ClearHistoryAPI(req: func.HttpRequest) -> func.HttpResponse:
-    execute_clear_history()
-
-    return func.HttpResponse(status_code=200)
-
-def handle_query(query: str):
-    try:
-        # Based on CLI's main function logic
-        should_get_embeddings = should_pull_more_embeddings(query)
-        if should_get_embeddings:
-            embeddings = query_embeddings(query)
-            if len(embeddings) == 0:
-                logging.error("No matches found in vector database.")
-                return None
-            response = prompt_open_ai_with_embeddings([e["text"] for e in embeddings], query)
-        else:
-            response = prompt_open_ai(query)
-
-        return {"result": response}
-
-    except Exception as e:
-        logging.error(f"Error processing the query: {str(e)}")
-        return None
-    
 def normalize_text(text: str):
     text = re.sub(r'\s+',  ' ', text).strip()
     text = re.sub(r". ,","",text)
@@ -85,21 +29,11 @@ def get_cosmos_container():
     container = database.get_container_client(get_config("CONTAINER_NAME"))
     return container
 
-def get_system_prompt():
-    return '''You are a CMS Regulation Analyst that analyzes pricing regulations and provides concise and accurate summaries of the regulations.  
-            When you provide a list or numbered output provide atleast 3 sentences describing each item.  
-            When you provide a list do not limit the number of items in the list.  Error on the side of too many items in the list.
-            Your main job is to assist the user with summarizing and providing interesting insights into the regulations.  
-            You are also expected to summarize content, when requested, for usage in social media posts.  When summarizing content for social media posts it is ok to use emoji's or graphics from outside the context of the conversation history.
-            When prompted to do math, double check your work to verify accuracy. 
-            When asked to provide page numbers look for the page number tag surrounding the text in the format of <Page {number}>{text}</Page {number}>'''
-
-
 def search_embeddings(embedding: list[float], model_type):
     container = get_cosmos_container()
     items = []
     for item in container.query_items(
-        query="SELECT TOP 15 c.id, c.modelType, c.text, c.pageIndex, c.documentType, VectorDistance(c.vector, @embedding) as similiarityScore FROM c ORDER BY VectorDistance(c.vector, @embedding)",
+        query="SELECT TOP 5 c.id, c.modelType, c.text, c.pageIndex, c.documentType, VectorDistance(c.vector, @embedding) as similiarityScore FROM c ORDER BY VectorDistance(c.vector, @embedding)",
         parameters=[dict(
             name="@embedding", value=embedding
         )],
@@ -130,7 +64,7 @@ def should_pull_more_embeddings(query: str):
 
     messages.append({
         "role": "system",
-        "content": get_system_prompt()
+        "content": "You are a CMS Regulation Analyst that analyzes pricing regulations and provides concise and accurate summaries of the regulations.  Your main job is to assist the user with summarizing and providing interesting insights into the regulations"
     })
 
     for message in historical_messages:
@@ -156,8 +90,28 @@ def should_pull_more_embeddings(query: str):
 
     decision = chat_completion.choices[0].message.content
     
-    #print(f'Initial embeddings question response "{decision}"')
+    print(f'Initial embeddings question response "{decision}"')
 
+    # messages.append({
+    #     "role": "assistant",
+    #     "content": decision
+    # })
+
+    # messages.append({
+    #     "role": "user",
+    #     "content": '''Could you double check your previous response and verify that it was correct? If it was correct, echo the exact response.  Otherwise provide the correct response. Only response with a "yes" or "no".
+
+    #         You Previous Answer: {decision}'''
+    # })
+
+    # chat_completion = openai_client.chat.completions.create(
+    #     messages=messages,
+    #     model=get_config("ChatModel")
+    # )
+    
+    # decision = chat_completion.choices[0].message.content
+
+    # print(f'Checked embeddings question response "{decision}"')
 
     return decision.lower().strip() == 'yes'
 
@@ -205,7 +159,7 @@ def add_to_history(new_convo):
     for c in new_convo:
         existing_history.append(c)
     cache_path = Path('./conversation_history/convo_cache.json')
-    with open(cache_path, 'w', encoding='utf-8') as convo_writer:
+    with open(cache_path, 'w') as convo_writer:
         history_json = json.dumps(existing_history)
         convo_writer.write(history_json)
 
@@ -224,7 +178,7 @@ def prompt_open_ai_with_embeddings(embeddings: list[str], query: str):
 
     messages.append({
         "role": "system",
-        "content": get_system_prompt()
+        "content": "You are a CMS Regulation Analyst that analyzes pricing regulations and provides concise and accurate summaries of the regulations.  Your main job is to assist the user with summarizing and providing interesting insights into the regulations"
     })
 
     for message in historical_messages:
@@ -251,14 +205,12 @@ def prompt_open_ai_with_embeddings(embeddings: list[str], query: str):
         model=get_config("ChatModel")
     )
 
-    #print(chat_completion.choices[0].message.content)
+    print(chat_completion.choices[0].message.content)
 
     add_to_history([new_user_message, {
         "role": "assistant",
         "content": chat_completion.choices[0].message.content
     }])
-
-    return chat_completion.choices[0].message.content
 
 def prompt_open_ai(query: str):
     openai_client = AzureOpenAI(
@@ -273,11 +225,14 @@ def prompt_open_ai(query: str):
 
     messages.append({
         "role": "system",
-        "content": get_system_prompt()
+        "content": '''You are a CMS Regulation Analyst that analyzes pricing regulations and provides concise and accurate summaries of the regulations.  
+            Your main job is to assist the user with summarizing and providing interesting insights into the regulations'''
     })
 
     for message in historical_messages:
-        messages.append(message)    
+        messages.append(message)
+
+    
 
     new_user_message = {
                 "role": "user",
@@ -297,16 +252,60 @@ def prompt_open_ai(query: str):
         model=get_config("ChatModel")
     )
 
-    #print(chat_completion.choices[0].message.content)
+    print(chat_completion.choices[0].message.content)
 
     add_to_history([new_user_message, {
         "role": "assistant",
         "content": chat_completion.choices[0].message.content
     }])
 
-    return chat_completion.choices[0].message.content
-
 def execute_clear_history(): 
     cache_path = Path('./conversation_history/convo_cache.json')
     if cache_path.exists():
         cache_path.unlink()
+
+def main():
+    try:
+        opts, _ = getopt.getopt(sys.argv[1:], "q:c", ["query=", "clear-history"])
+    except getopt.GetoptError:
+        print_help()
+        sys.exit(2)
+        
+    if requesting_help(opts):
+        print_help()
+        sys.exit(0)
+
+    clear_history = get_flag(opts, '-c')
+    if clear_history:
+        print('Clearing convo history...')
+        execute_clear_history()
+
+    query = get_value(opts, '-q')
+    if query != None:
+        should_get_embeddings = should_pull_more_embeddings(query)
+        if should_get_embeddings:
+            embeddings = query_embeddings(query)
+            if len(embeddings) == 0:
+                print('We are unable to complete your request at this time. We were unable to find context for your query.')
+                sys.exit(0)
+            prompt_open_ai_with_embeddings([e["text"] for e in embeddings], query)
+        else:
+            prompt_open_ai(query)
+
+def requesting_help(opts):
+    help = next((o for o in opts if len(o) > 0 and o[0] == '-h'), None)
+    return help != None
+
+def print_help():
+    print('You need help...')
+    
+def get_value(opts, parameter):
+    value_arg = next((o for o in opts if len(o) > 0 and o[0] == parameter and len(o) == 2), None)
+    return value_arg[1] if value_arg != None else None
+
+def get_flag(opts, parameter):
+    value_arg = next((o for o in opts if len(o) > 0 and o[0] == parameter), None)
+    return value_arg != None
+
+if __name__ == "__main__":
+	sys.exit(main())

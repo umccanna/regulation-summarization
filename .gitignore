@@ -162,3 +162,5 @@ cython_debug/
 #.idea/
 
 convo_cache.json
+
+node_modules

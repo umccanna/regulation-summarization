@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Interface</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .typing-indicator {
+            display: flex;
+            gap: 4px;
+            padding: 12px;
+        }
+
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            background-color: #9CA3AF;
+            border-radius: 50%;
+            animation: typing-bounce 1.4s infinite ease-in-out;
+        }
+
+        .typing-dot:nth-child(1) { animation-delay: 0s; }
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes typing-bounce {
+            0%, 80%, 100% { transform: translateY(0); }
+            40% { transform: translateY(-8px); }
+        }
+
+        @media (min-height: 800px) {
+            .chat-container {
+                height: 80vh;
+            }
+        }
+
+        /* Add styles for ordered lists */
+        .message-content ol {
+            list-style-type: decimal;
+            padding-left: 2.5rem;
+            margin: 1rem 0;
+        }
+
+        .message-content li {
+            margin-bottom: 0.5rem;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-4xl">
+        <div class="bg-white rounded-lg shadow-lg p-6 chat-container flex flex-col">
+            <!-- Header with Reset button -->
+            <div class="flex justify-between items-center mb-4 pb-4 border-b">
+                <h1 class="text-xl font-semibold">Chat Interface</h1>
+                <button 
+                    id="reset-button"
+                    class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition-colors"
+                >
+                    Reset Chat
+                </button>
+            </div>
+
+            <!-- Chat messages container -->
+            <div id="chat-messages" class="flex-1 space-y-4 overflow-y-auto mb-4" style="min-height: 500px;">
+                <div class="bg-blue-100 p-4 rounded">
+                    <p>Welcome! How can I help you today?</p>
+                </div>
+            </div>
+
+            <!-- Input form -->
+            <form id="chat-form" class="flex gap-2 pt-4 border-t">
+                <input 
+                    type="text" 
+                    id="user-input" 
+                    class="flex-1 p-3 border rounded focus:outline-none focus:border-blue-500"
+                    placeholder="Type your message..."
+                    required
+                >
+                <button 
+                    type="submit"
+                    id="send-button"
+                    class="bg-blue-500 text-white px-6 py-3 rounded hover:bg-blue-600 transition-colors"
+                >
+                    Send
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Typing indicator template -->
+    <template id="typing-template">
+        <div class="bg-gray-50 p-4 rounded">
+            <div class="typing-indicator">
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+            </div>
+        </div>
+    </template>
+
+    <script>
+        const chatMessages = document.getElementById('chat-messages');
+        const chatForm = document.getElementById('chat-form');
+        const userInput = document.getElementById('user-input');
+        const sendButton = document.getElementById('send-button');
+        const resetButton = document.getElementById('reset-button');
+        const typingTemplate = document.getElementById('typing-template');
+
+        // Configure marked options
+        marked.setOptions({
+            breaks: true,
+            gfm: true,
+            pedantic: false,
+            headerIds: false
+        });
+
+        function addMessage(content, isUser = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = isUser ? 
+                'bg-blue-50 p-4 rounded' : 
+                'bg-gray-50 p-4 rounded message-content';
+
+            if (isUser) {
+                messageDiv.textContent = content;
+            } else {
+                // Ensure proper list rendering by adding a newline before lists
+                const processedContent = content.replace(/^\d+\./gm, '\n$&');
+                const htmlContent = marked.parse(processedContent);
+                const sanitizedHtml = DOMPurify.sanitize(htmlContent);
+                messageDiv.innerHTML = sanitizedHtml;
+            }
+
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function showTypingIndicator() {
+            const typingIndicator = typingTemplate.content.cloneNode(true);
+            chatMessages.appendChild(typingIndicator);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            return chatMessages.lastElementChild;
+        }
+
+        function removeTypingIndicator(indicator) {
+            if (indicator && indicator.parentNode) {
+                indicator.remove();
+            }
+        }
+
+        function clearChat() {
+            while (chatMessages.children.length > 1) {
+                chatMessages.removeChild(chatMessages.lastChild);
+            }
+            userInput.value = '';
+            userInput.focus();
+        }
+
+        async function resetConversation() {
+            try {
+                resetButton.disabled = true;
+                userInput.disabled = true;
+                sendButton.disabled = true;
+
+                const response = await fetch('http://localhost:7071/api/clear', {
+                    method: 'POST'
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to reset conversation');
+                }
+
+                clearChat();
+            } catch (error) {
+                addMessage('Sorry, there was an error resetting the conversation. Please try again.');
+                console.error('Error:', error);
+            } finally {
+                resetButton.disabled = false;
+                userInput.disabled = false;
+                sendButton.disabled = false;
+            }
+        }
+
+        async function sendMessage(message) {
+            userInput.disabled = true;
+            sendButton.disabled = true;
+            resetButton.disabled = true;
+            
+            const typingIndicator = showTypingIndicator();
+
+            try {
+                const response = await fetch(`http://localhost:7071/api/summarize?query=${encodeURIComponent(message)}`);
+                if (!response.ok) {
+                    throw new Error('API request failed');
+                }
+                const data = await response.json();
+                
+                removeTypingIndicator(typingIndicator);
+                addMessage(data.result);
+            } catch (error) {
+                removeTypingIndicator(typingIndicator);
+                addMessage('Sorry, there was an error processing your request. Please try again.');
+                console.error('Error:', error);
+            } finally {
+                userInput.disabled = false;
+                sendButton.disabled = false;
+                resetButton.disabled = false;
+                userInput.focus();
+            }
+        }
+
+        chatForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const message = userInput.value.trim();
+            if (!message) return;
+
+            addMessage(message, true);
+            userInput.value = '';
+            await sendMessage(message);
+        });
+
+        resetButton.addEventListener('click', resetConversation);
+
+        userInput.focus();
+    </script>
+</body>
+</html>
