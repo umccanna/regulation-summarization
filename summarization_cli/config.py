@@ -10,8 +10,6 @@ __configuration = {
         "FinalRuleLocation": "T:\\Data\\CMS\\Fee Schedules\\GenAI Summarization\\Analysis\\TextExractAndVectorization\\0_Final Ruling\\CY2024 OPPS Final Rule.pdf",
         "Year": 2024,
         "Model": "OPPS",
-        "FactSheetTextOutputLocation": "T:\\Data\\CMS\\Fee Schedules\\GenAI Summarization\\Analysis\\TextExractAndVectorization\\TextOutput\\fact_sheet.txt",
-        "FinalRuleTextOutputLocation": "T:\\Data\\CMS\\Fee Schedules\\GenAI Summarization\\Analysis\\TextExractAndVectorization\\TextOutput\\final_rule.txt",
         "AZURE_OPENAI_ENDPOINT": "https://seattlehealth-openai.openai.azure.com/",
         "AZURE_OPENAI_API_KEY": "",
         "EmbeddingsModel": "seattlehealth-embeddings-small",

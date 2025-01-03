@@ -58,13 +58,14 @@ def handle_query(query: str):
             if len(embeddings) == 0:
                 logging.error("No matches found in vector database.")
                 return None
-            response = prompt_open_ai_with_embeddings(fact_sheet, [e["text"] for e in embeddings], query)
+            response = prompt_open_ai_with_embeddings([e["text"] for e in fact_sheet], [e["text"] for e in embeddings], query)
         else:
-            response = prompt_open_ai(fact_sheet, query)
+            response = prompt_open_ai([e["text"] for e in fact_sheet], query)
 
         return {"result": response}
 
     except Exception as e:
+        print(e)
         logging.error(f"Error processing the query: {str(e)}")
         return None
     
@@ -92,12 +93,17 @@ def get_cosmos_container():
 
 def get_system_prompt():
     return '''You are a CMS Regulation Analyst that analyzes pricing regulations and provides concise and accurate summaries of the regulations.  
-            When you provide a list or numbered output provide atleast 3 sentences describing each item.  
-            When you provide a list do not limit the number of items in the list.  Error on the side of too many items in the list.
-            Your main job is to assist the user with summarizing and providing interesting insights into the regulations.  
-            You are also expected to summarize content, when requested, for usage in social media posts.  When summarizing content for social media posts it is ok to use emoji's or graphics from outside the context of the conversation history.
-            When prompted to do math, double check your work to verify accuracy. 
-            When asked to provide page numbers look for the page number tag surrounding the text in the format of <Page {number}>{text}</Page {number}>'''
+            Adhere to these high level guides when responding: 
+
+            * You are NOT a counselor or personal care advisor.  DO NOT provide any self help, mental health, or physcial health advice.  Only respond in relation to the regulations you are summarizing. If the regulations you are summarizing involves details related to self-help, counseling, mental health, of physical health then it is premitted to respond in relation to the regulations.  
+            * When you provide a list or numbered output provide atleast 3 sentences describing each item.  
+            * When you provide a list do not limit the number of items in the list.  Error on the side of too many items in the list.
+            * When asked to provide a summary of changes be sure to include any content related to litigations or lawsuits. 
+            * Your main job is to assist the user with summarizing and providing interesting insights into the regulations.  
+            * You are also expected to summarize content, when requested, for usage in social media posts.  
+            * When summarizing content for social media posts it is ok to use emoji's or graphics from outside the context of the conversation history.
+            * When prompted to do math, double check your work to verify accuracy. 
+            * When asked to provide page numbers look for the page number tag surrounding the text in the format of <Page {number}>{text}</Page {number}>'''
 
 
 def search_embeddings(embedding: list[float], model_type):
@@ -113,15 +119,18 @@ def search_embeddings(embedding: list[float], model_type):
         items.append({
             "id": item["id"],
             "modelType": item["modelType"],
-            "text": item["text"],
+            "text": item["text"].encode("utf-8").decode("utf-8"),
             "documentType": item["documentType"],
             "similiarityScore": item["similiarityScore"]
         })
+
+    print(f'Embedding results found {len(items)}')
     return items
 
 def should_pull_fact_sheet(query: str):
     historical_messages = get_history()
     if len(historical_messages) == 0:
+        print('No history, pull the fact sheet')
         return True
     
     openai_client = AzureOpenAI(
@@ -161,12 +170,14 @@ def should_pull_fact_sheet(query: str):
 
     decision = chat_completion.choices[0].message.content
 
+    print(f'Whether or not to include the fact sheet: {decision}')
+
     return decision.lower().strip() == 'yes'
 
 def should_pull_more_embeddings(query: str):
-
     historical_messages = get_history()
     if len(historical_messages) == 0:
+        print('No history, should pull more embeddings')
         return True
     
     openai_client = AzureOpenAI(
@@ -205,10 +216,11 @@ def should_pull_more_embeddings(query: str):
 
     decision = chat_completion.choices[0].message.content
 
+    print(f'Whether or not to pull more embeddings: {decision}')
+
     return decision.lower().strip() == 'yes'
 
-def get_fact_sheet():
-    
+def get_fact_sheet():    
     year = get_config("Year")
     model = get_config("Model")
     container = get_cosmos_container()
@@ -221,11 +233,11 @@ def get_fact_sheet():
         items.append({
             "id": item["id"],
             "modelType": item["modelType"],
-            "text": item["text"],
+            "text": item["text"].encode("utf-8").decode("utf-8"),
             "documentType": item["documentType"]
         })
 
-    print('found fact sheet items', len(items))
+    print(f'found fact sheet items {items}')
     return items
 
 def query_embeddings(query: str):
@@ -283,11 +295,10 @@ def prompt_open_ai_with_embeddings(fact_sheet_parts: list[str], embeddings: list
         azure_endpoint = get_config("AZURE_OPENAI_ENDPOINT")
     )
 
-
     context = " ".join(embeddings)
 
     historical_messages = get_history()
-    
+
     messages = []
 
     messages.append({
@@ -299,13 +310,13 @@ def prompt_open_ai_with_embeddings(fact_sheet_parts: list[str], embeddings: list
         messages.append(message)
 
     fact_sheet = " ".join(fact_sheet_parts)
+
     fact_sheet_prompt = ''
     if len(fact_sheet_parts) > 0:
         fact_sheet_prompt = f'''
             Fact Sheet:
             {fact_sheet}
         '''
-
     new_user_message = {
                 "role": "user",
                 "content": f'''
@@ -325,12 +336,14 @@ def prompt_open_ai_with_embeddings(fact_sheet_parts: list[str], embeddings: list
 
     messages.append(new_user_message)    
 
+    print(f'Messages to be sent. {messages}')
+
     chat_completion = openai_client.chat.completions.create(
         messages=messages,
         model=get_config("ChatModel")
     )
 
-    #print(chat_completion.choices[0].message.content)
+    print(f'Result from open AI: {chat_completion}')
 
     add_to_history([new_user_message, {
         "role": "assistant",

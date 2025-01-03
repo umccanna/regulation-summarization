@@ -11,12 +11,15 @@ import json
 def normalize_text(text: str):
     text = re.sub(r'\s+',  ' ', text).strip()
     text = re.sub(r". ,","",text)
-    text = re.sub(r"\\u(?:[a-z]|\d){4}", "", text)
     # remove all instances of multiple spaces
     text = text.replace("..",".")
     text = text.replace(". .",".")
     text = text.replace("\n", "")
     text = text.replace("\r", "")
+
+    # replace unicode characters with more usable characters 
+    text = text.replace("●", "*")
+    text = text.replace("‑", "-")
     text = text.strip()
     
     return text
