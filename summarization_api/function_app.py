@@ -38,11 +38,87 @@ def SummarizationAPI(req: func.HttpRequest) -> func.HttpResponse:
             status_code=500
         )
     
+@app.route(route="regulations", auth_level=func.AuthLevel.ANONYMOUS, methods=["GET"])
+def GetSupportedRegulationsAPI(req: func.HttpRequest) -> func.HttpResponse:
+    regulations = get_supported_regulations()
+    return func.HttpResponse(
+        json.dumps(regulations),
+        status_code=200,
+        mimetype="application/json"
+    )
+
+@app.route(route="regulations", auth_level=func.AuthLevel.ANONYMOUS, methods=["POST"])
+def SetRegulationsAPI(req: func.HttpRequest) -> func.HttpResponse:
+    try:
+        req_body = req.get_json()
+        model = req_body.get('model')
+        year = req_body.get('year')
+
+        if not model or not year:
+            return func.HttpResponse(
+                "Request body must include 'model' and 'year'",
+                status_code=400
+            )
+
+        regulations = get_supported_regulations()
+        if not any(r for r in regulations if r["model"] == model and r["year"] == year):
+            return func.HttpResponse(
+                "Invalid model and year combination",
+                status_code=400
+            )
+
+        execute_clear_history()
+
+        cache_path = Path('./conversation_history/selected_regulation.json')
+        with open(cache_path, 'w', encoding='utf-8') as writer:
+            json.dump({"model": model, "year": year}, writer)
+
+        return func.HttpResponse(status_code=200)
+
+    except Exception as e:
+        logging.error(f"Error setting regulations: {str(e)}")
+        return func.HttpResponse(
+            "Error processing request",
+            status_code=500
+        )
+
+@app.route(route="regulations/selected", auth_level=func.AuthLevel.ANONYMOUS, methods=["GET"])
+def GetSelectedRegulationAPI(req: func.HttpRequest) -> func.HttpResponse:
+    try:
+        cache_path = Path('./conversation_history/selected_regulation.json')
+        if not cache_path.exists():
+            return func.HttpResponse(
+                "No regulation selected",
+                status_code=404
+            )
+            
+        with open(cache_path, 'r') as reader:
+            selected_regulation = json.load(reader)
+            return func.HttpResponse(
+                json.dumps(selected_regulation),
+                status_code=200,
+                mimetype="application/json"
+            )
+    except Exception as e:
+        logging.error(f"Error getting selected regulation: {str(e)}")
+        return func.HttpResponse(
+            "Error retrieving selected regulation",
+            status_code=500
+        )
+
 @app.route(route="clear", auth_level=func.AuthLevel.ANONYMOUS)
 def ClearHistoryAPI(req: func.HttpRequest) -> func.HttpResponse:
     execute_clear_history()
 
     return func.HttpResponse(status_code=200)
+
+def get_selected_regulation():
+    cache_path = Path('./conversation_history/selected_regulation.json')
+    if not cache_path.exists():
+        return None
+    
+    with open(cache_path, 'r') as reader:
+        return json.load(reader)
 
 def handle_query(query: str):
     try:
@@ -123,13 +199,13 @@ def search_embeddings(embedding: list[float], model_type):
             "similiarityScore": item["similiarityScore"]
         })
 
-    print(f'Embedding results found {len(items)}')
+    logging.info(f'Embedding results found {len(items)}')
     return items
 
 def should_pull_fact_sheet(query: str):
     historical_messages = get_history()
     if len(historical_messages) == 0:
-        print('No history, pull the fact sheet')
+        logging.info('No history, pull the fact sheet')
         return True
     
     openai_client = AzureOpenAI(
@@ -162,6 +238,8 @@ def should_pull_fact_sheet(query: str):
         ''',
     })  
 
+    logging.info('Determining if we should pull the fact sheet')
+
     chat_completion = openai_client.chat.completions.create(
         messages=messages,
         model=get_config("ChatModel")
@@ -169,14 +247,14 @@ def should_pull_fact_sheet(query: str):
 
     decision = chat_completion.choices[0].message.content
 
-    print(f'Whether or not to include the fact sheet: {decision}')
+    logging.info(f'Whether or not to include the fact sheet: {decision}')
 
     return decision.lower().strip() == 'yes'
 
 def should_pull_more_embeddings(query: str):
     historical_messages = get_history()
     if len(historical_messages) == 0:
-        print('No history, should pull more embeddings')
+        logging.info('No history, should pull more embeddings')
         return True
     
     openai_client = AzureOpenAI(
@@ -194,6 +272,8 @@ def should_pull_more_embeddings(query: str):
 
     for message in historical_messages:
         messages.append(message)
+
+    logging.info('Determining if we should pull more embeddings')
 
     messages.append({
                 "role": "user",
@@ -215,15 +295,22 @@ def should_pull_more_embeddings(query: str):
 
     decision = chat_completion.choices[0].message.content
 
-    print(f'Whether or not to pull more embeddings: {decision}')
+    logging.info(f'Whether or not to pull more embeddings: {decision}')
 
     return decision.lower().strip() == 'yes'
 
 def get_fact_sheet():    
-    year = get_config("Year")
-    model = get_config("Model")
+    selected_regulation = get_selected_regulation()
+    if not selected_regulation:
+        return []
+    
+    year = selected_regulation["year"]
+    model = selected_regulation["model"]
     container = get_cosmos_container()
     items = []
+
+    logging.info('Getting fact sheet')
+
     for item in container.query_items(
         query="SELECT TOP 15 c.id, c.modelType, c.text, c.pageIndex, c.documentType FROM c WHERE c.documentType = 'FactSheet' ORDER BY c.pageIndex ASC",
         parameters=[],
@@ -246,20 +333,23 @@ def query_embeddings(query: str):
     )
 
     normalized_query = normalize_text(query)
+    logging.info('Normalized Query')
 
-    print('Normalized Query')
-
-    print('Generating query embeddings')
+    logging.info('Generating query embeddings')
     embeddings = generate_embeddings(openai_client, normalized_query)
 
-    year = get_config("Year")
-    model = get_config("Model")
+    selected_regulation = get_selected_regulation()
+    if not selected_regulation:
+        return []
+    
+    year = selected_regulation["year"]
+    model = selected_regulation["model"]
 
-    print("Searching Embeddings")
+    logging.info("Searching Embeddings")
     results = search_embeddings(embeddings, f'{model}_{year}')
 
     if len(results) == 0:
-        print('No matches found')
+        logging.info('No matches found')
         return []
     
     return results
@@ -276,6 +366,26 @@ def get_history():
             conversation_history.append(c)
     
     return conversation_history
+
+def get_supported_regulations():
+    container = get_cosmos_container()
+    supported_regulations = []
+
+    logging.info('Getting supported regulations')
+
+    for item in container.query_items(
+        query="SELECT TOP 1 c.regulations FROM c WHERE c.id = 'SupportedRegulations'",
+        parameters=[],
+        partition_key=f'Default'
+    ):
+        for regulation in item["regulations"]:
+            supported_regulations.append({
+                "model": regulation["model"],
+                "year": regulation["year"]
+            })
+
+    return supported_regulations
+
         
 def add_to_history(new_convo):
     existing_history = get_history()
@@ -292,6 +402,8 @@ def prompt_open_ai_with_embeddings(fact_sheet_parts: list[str], embeddings: list
         api_version = "2024-02-01",
         azure_endpoint = get_config("AZURE_OPENAI_ENDPOINT")
     )
+
+    logging.info('Calling OpenAI with embeddings')
 
     context = " ".join(embeddings)
 
@@ -352,6 +464,8 @@ def prompt_open_ai(fact_sheet_parts: list[str], query: str):
         api_version = "2024-02-01",
         azure_endpoint = get_config("AZURE_OPENAI_ENDPOINT")
     )
+
+    logging.info('Calling OpenAI without embeddings')
 
     historical_messages = get_history()
     
