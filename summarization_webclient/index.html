@@ -75,13 +75,24 @@
 
             <div id="regulation-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
                 <div class="bg-white p-6 rounded-lg max-w-md w-full">
-                    <h2 class="text-lg font-semibold mb-4">Select Regulation</h2>
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-lg font-semibold">Select Regulation</h2>
+                        <button 
+                            id="close-regulation-modal"
+                            class="text-gray-500 hover:text-gray-700 hidden"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
                     <div id="regulation-loading" class="py-8 flex justify-center items-center hidden">
                         <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
                     </div>
                     <div id="regulation-list" class="space-y-2 mb-4"></div>
                 </div>
             </div>
+
             <div id="initial-loading" class="fixed inset-0 bg-white flex items-center justify-center">
                 <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
             </div>
@@ -130,6 +141,7 @@
         const sendButton = document.getElementById('send-button');
         const resetButton = document.getElementById('reset-button');
         const typingTemplate = document.getElementById('typing-template');
+        const closeButton = document.getElementById('close-regulation-modal');
 
         marked.setOptions({
             breaks: true,
@@ -234,6 +246,9 @@
         async function checkSelectedRegulation() {
             try {
                 const response = await fetch('http://localhost:7071/api/regulations/selected');
+                const hasRegulation = response.status !== 404;
+                closeButton.classList.toggle('hidden', !hasRegulation);
+                
                 if (response.status === 404) {
                     showRegulationModal();
                     return false;
@@ -356,7 +371,7 @@
                 if (!hasRegulation) {
                     disableChat();
                 }
-                await resetConversation(); // make sure the conversation is cleared on init
+                await resetConversation();
             } finally {
                 document.getElementById('initial-loading').remove();
             }
@@ -373,6 +388,7 @@
         });
 
         resetButton.addEventListener('click', resetConversation);
+        closeButton.addEventListener('click', hideRegulationModal);
         
         init();
     </script>
