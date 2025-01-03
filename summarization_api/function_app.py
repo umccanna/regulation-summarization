@@ -65,7 +65,6 @@ def handle_query(query: str):
         return {"result": response}
 
     except Exception as e:
-        print(e)
         logging.error(f"Error processing the query: {str(e)}")
         return None
     
@@ -237,7 +236,6 @@ def get_fact_sheet():
             "documentType": item["documentType"]
         })
 
-    print(f'found fact sheet items {items}')
     return items
 
 def query_embeddings(query: str):
@@ -249,7 +247,7 @@ def query_embeddings(query: str):
 
     normalized_query = normalize_text(query)
 
-    print(f'Normalized Query: {normalized_query}')
+    print('Normalized Query')
 
     print('Generating query embeddings')
     embeddings = generate_embeddings(openai_client, normalized_query)
@@ -321,7 +319,7 @@ def prompt_open_ai_with_embeddings(fact_sheet_parts: list[str], embeddings: list
                 "role": "user",
                 "content": f'''
                     Only provide responses that can be found "Context:" provided below or from the "Context:" in previous messages based on the user's "Prompt:".  
-                    If you are unable to find a response in the below "Context:" or previous "Context:" do not make anything up.  Just response with "I'm not sure".
+                    If you are unable to find a response in the below "Context:" or previous "Context:" do not make anything up.  Just response with "I'm not sure how to help you with that.  I may not have been designed to help with your request.".
                     If a "Fact Sheet:" is provided use that content to inform and focus the response. 
 
                     Prompt:
@@ -334,16 +332,12 @@ def prompt_open_ai_with_embeddings(fact_sheet_parts: list[str], embeddings: list
                 ''',
             }
 
-    messages.append(new_user_message)    
-
-    print(f'Messages to be sent. {messages}')
+    messages.append(new_user_message)
 
     chat_completion = openai_client.chat.completions.create(
         messages=messages,
         model=get_config("ChatModel")
     )
-
-    print(f'Result from open AI: {chat_completion}')
 
     add_to_history([new_user_message, {
         "role": "assistant",
@@ -383,7 +377,7 @@ def prompt_open_ai(fact_sheet_parts: list[str], query: str):
                 "role": "user",
                 "content": f'''
                     Only provide responses that can be found in the "Context:" of previous messages based on the user's "Prompt:".  
-                    If you are unable to find a response in the below "Context:" or previous "Context:" do not make anything up.  Just response with "I'm not sure".
+                    If you are unable to find a response in the below "Context:" or previous "Context:" do not make anything up.  Just response with "I'm not sure how to help you with that.  I may not have been designed to help with your request.".
                     If a "Fact Sheet:" is provided use that content to inform and focus the response. 
 
                     Prompt:
@@ -399,8 +393,6 @@ def prompt_open_ai(fact_sheet_parts: list[str], query: str):
         messages=messages,
         model=get_config("ChatModel")
     )
-
-    #print(chat_completion.choices[0].message.content)
 
     add_to_history([new_user_message, {
         "role": "assistant",
