@@ -6,10 +6,14 @@ load_dotenv()
 
 __configuration = {
     "Default": {
-        "FactSheetLocation": "T:\\Data\\CMS\\Fee Schedules\\GenAI Summarization\\Analysis\\TextExractAndVectorization\\0_Final Ruling\\CY2024 OPPS Final Rule Fact Sheet.pdf",
-        "FinalRuleLocation": "T:\\Data\\CMS\\Fee Schedules\\GenAI Summarization\\Analysis\\TextExractAndVectorization\\0_Final Ruling\\CY2024 OPPS Final Rule.pdf",
+        "FactSheetLocation": "T:\\Data\\CMS\\Fee Schedules\\2025\\RBRVS\\Data\\01 - Final Rule\\Calendar Year (CY) 2025 Medicare Physician Fee Schedule Final Rule _ CMS.pdf",
+        "FinalRuleLocation": "T:\\Data\\CMS\\Fee Schedules\\2025\\RBRVS\Data\\01 - Final Rule\\2024-25382.pdf",
+        #"FactSheetLocation": "T:\\Data\\CMS\\Fee Schedules\\2024\\OPPS\\Data\\01 - Final Rule\\CY2024 OPPS Final Rule Fact Sheet.pdf",
+        #"FinalRuleLocation": "T:\\Data\\CMS\\Fee Schedules\\2024\\OPPS\\Data\\01 - Final Rule\\CY2024 OPPS Final Rule.pdf",
+        #"FactSheetLocation": "T:\\Data\\CMS\\Fee Schedules\\2025\\OPPS\\Data\\01 - Final Rule\\CY2025 OPPS Final Rule Fact Sheet.pdf",
+        #"FinalRuleLocation": "T:\\Data\\CMS\\Fee Schedules\\2025\\OPPS\\Data\\01 - Final Rule\\CY2025 OPPS Final Rule.pdf",
         "Year": 2024,
-        "Model": "OPPS",
+        "Model": "Prof",
         "AZURE_OPENAI_ENDPOINT": "https://seattlehealth-openai.openai.azure.com/",
         "AZURE_OPENAI_API_KEY": "",
         "EmbeddingsModel": "seattlehealth-embeddings-small",
@@ -18,7 +22,7 @@ __configuration = {
         "COSMOS_DB_KEY": "",
         "DATABASE_NAME": "summarizations",
         "CONTAINER_NAME": "pricingregulations",
-        "ChunkSize": 20,
+        "ChunkSize": 30,
         "Overlap": 5,
         "ChunkingCharacter":".",
         "SpoolingSize": 50

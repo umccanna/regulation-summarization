@@ -180,7 +180,6 @@ def get_system_prompt():
             * When prompted to do math, double check your work to verify accuracy. 
             * When asked to provide page numbers look for the page number tag surrounding the text in the format of <Page {number}>{text}</Page {number}>'''
 
-
 def search_embeddings(embedding: list[float], model_type):
     container = get_cosmos_container()
     items = []

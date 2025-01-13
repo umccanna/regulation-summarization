@@ -76,6 +76,27 @@ def upload_fact_sheet():
             model = get_config("Model")
             print(f"Saving page {i+1}")
             create_document(cosmos_container, normalized_page_text, embeddings, i, f"{model}_{year}", "FactSheet")
+
+def delete_document_type(document_type: str):
+    print(f'Deleting document {document_type}')
+    cosmos_container = get_cosmos_container()
+    year = get_config("Year")
+    model = get_config("Model")
+    partition_key = f"{model}_{year}"
+    query = f"SELECT * FROM c WHERE c.partitionKey = '{partition_key}' AND c.documentType = '{document_type}'"
+    items = cosmos_container.query_items(query=query, enable_cross_partition_query=False)
+    deleted_count = 0
+    for item in items:
+        try:
+            cosmos_container.delete_item(item=item['id'], partition_key=partition_key)
+            deleted_count += 1
+        except Exception as e:
+            print(f"Failed to delete item {item['id']}: {str(e)}")
+
+        if deleted_count % 100 == 0:
+            print(f'Deleted {deleted_count} items')
+    
+    print(f'Deleted {deleted_count} items')
             
 def upload_final_ruling():
     print('Uploading Final Ruling')
@@ -107,7 +128,7 @@ def upload_final_ruling():
             normalized_page_text = strip_emails_and_phone_numbers_and_web_addresses(page_text)
             normalized_page_text = normalize_text(normalized_page_text)
 
-            if not start_indexing and "Summary and Background" in normalized_page_text:
+            if not start_indexing: # and "Summary and Background" in normalized_page_text:
                 start_indexing = True
 
             if not start_indexing:
@@ -115,14 +136,14 @@ def upload_final_ruling():
                 continue
 
             for text in normalized_page_text.split(chunking_character):
-                text_accumulator.append(f'<Page {i+1}>{text}</Page {i+1}>')
+                text_accumulator.append(f'<Page {i+1}>{text.strip()}</Page {i+1}>')
                 if len(text_accumulator) > chunk_size:
                     chunk_accumulator.append(text_accumulator)
                     total_chunks+=1
                     text_accumulator = []
                 
                 if len(chunk_accumulator) == spooling_size:
-                    overlap_and_upload_chunks(cosmos_container, chunk_accumulator, overlap_size, openai_client, True, total_chunks, total_chunks_uploaded, chunking_character)
+                    overlap_and_upload_chunks(cosmos_container, chunk_accumulator, overlap_size, openai_client, True, total_chunks, total_chunks_uploaded, '')
                     total_chunks_uploaded+=(len(chunk_accumulator)-1)
                     chunk_accumulator = chunk_accumulator[(spooling_size-1):]
         
@@ -131,9 +152,9 @@ def upload_final_ruling():
             total_chunks+=1
             text_accumulator = []
 
-        overlap_and_upload_chunks(cosmos_container, chunk_accumulator, overlap_size, openai_client, False, total_chunks, total_chunks_uploaded, chunking_character)
+        overlap_and_upload_chunks(cosmos_container, chunk_accumulator, overlap_size, openai_client, False, total_chunks, total_chunks_uploaded, '')
 
-def overlap_and_upload_chunks(cosmos_container, chunk_accumulator, overlap_size, openai_client, ignore_last_index, total_chunks, total_already_uploaded, chunking_character):
+def overlap_and_upload_chunks(cosmos_container, chunk_accumulator, overlap_size, openai_client, ignore_last_index, total_chunks, total_already_uploaded, joining_character):
     overlapped_chunks = []
     if len(chunk_accumulator) > 1:
         for i, chunk in enumerate(chunk_accumulator):
@@ -164,7 +185,7 @@ def overlap_and_upload_chunks(cosmos_container, chunk_accumulator, overlap_size,
                 overlapped_chunks.append(new_chunk)
 
     for i, chunks in enumerate(overlapped_chunks):
-        chunked_data = chunking_character.join(chunks)
+        chunked_data = joining_character.join(chunks)
 
         embeddings = generate_embeddings(openai_client, chunked_data)
 
@@ -175,7 +196,7 @@ def overlap_and_upload_chunks(cosmos_container, chunk_accumulator, overlap_size,
 
 def main():
     try:
-        opts, _ = getopt.getopt(sys.argv[1:], "rf", ['upload-final-ruling', 'upload-fact-sheet'])
+        opts, _ = getopt.getopt(sys.argv[1:], "rfdt:", ['upload-final-ruling', 'upload-fact-sheet', 'delete-document-type', 'document-type'])
     except getopt.GetoptError:
         print_help()
         sys.exit(2)
@@ -191,6 +212,11 @@ def main():
     upload_fact = get_flag(opts, '-f')
     if upload_fact:
         upload_fact_sheet()
+
+    delete_document = get_flag(opts, '-d')
+    if delete_document:
+        document_type = get_value(opts, '-t')
+        delete_document_type(document_type)
 
 def requesting_help(opts):
     help = next((o for o in opts if len(o) > 0 and o[0] == '-h'), None)
