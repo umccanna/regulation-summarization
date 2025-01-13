@@ -38,14 +38,95 @@ def SummarizationAPI(req: func.HttpRequest) -> func.HttpResponse:
             status_code=500
         )
     
+@app.route(route="regulations", auth_level=func.AuthLevel.ANONYMOUS, methods=["GET"])
+def GetSupportedRegulationsAPI(req: func.HttpRequest) -> func.HttpResponse:
+    regulations = get_supported_regulations()
+    return func.HttpResponse(
+        json.dumps(regulations),
+        status_code=200,
+        mimetype="application/json"
+    )
+
+@app.route(route="regulations", auth_level=func.AuthLevel.ANONYMOUS, methods=["POST"])
+def SetRegulationsAPI(req: func.HttpRequest) -> func.HttpResponse:
+    try:
+        req_body = req.get_json()
+        model = req_body.get('model')
+        year = req_body.get('year')
+
+        if not model or not year:
+            return func.HttpResponse(
+                "Request body must include 'model' and 'year'",
+                status_code=400
+            )
+
+        regulations = get_supported_regulations()
+        if not any(r for r in regulations if r["model"] == model and r["year"] == year):
+            return func.HttpResponse(
+                "Invalid model and year combination",
+                status_code=400
+            )
+
+        execute_clear_history()
+
+        cache_path = Path('./conversation_history/selected_regulation.json')
+        with open(cache_path, 'w', encoding='utf-8') as writer:
+            json.dump({"model": model, "year": year}, writer)
+
+        return func.HttpResponse(status_code=200)
+
+    except Exception as e:
+        logging.error(f"Error setting regulations: {str(e)}")
+        return func.HttpResponse(
+            "Error processing request",
+            status_code=500
+        )
+
+@app.route(route="regulations/selected", auth_level=func.AuthLevel.ANONYMOUS, methods=["GET"])
+def GetSelectedRegulationAPI(req: func.HttpRequest) -> func.HttpResponse:
+    try:
+        cache_path = Path('./conversation_history/selected_regulation.json')
+        if not cache_path.exists():
+            return func.HttpResponse(
+                "No regulation selected",
+                status_code=404
+            )
+            
+        with open(cache_path, 'r') as reader:
+            selected_regulation = json.load(reader)
+            return func.HttpResponse(
+                json.dumps(selected_regulation),
+                status_code=200,
+                mimetype="application/json"
+            )
+    except Exception as e:
+        logging.error(f"Error getting selected regulation: {str(e)}")
+        return func.HttpResponse(
+            "Error retrieving selected regulation",
+            status_code=500
+        )
+
 @app.route(route="clear", auth_level=func.AuthLevel.ANONYMOUS)
 def ClearHistoryAPI(req: func.HttpRequest) -> func.HttpResponse:
     execute_clear_history()
 
     return func.HttpResponse(status_code=200)
 
+def get_selected_regulation():
+    cache_path = Path('./conversation_history/selected_regulation.json')
+    if not cache_path.exists():
+        return None
+    
+    with open(cache_path, 'r') as reader:
+        return json.load(reader)
+
 def handle_query(query: str):
     try:
+        should_include_fact_sheet = should_pull_fact_sheet(query)
+        fact_sheet = []
+        if should_include_fact_sheet:
+            fact_sheet = get_fact_sheet()
+
         # Based on CLI's main function logic
         should_get_embeddings = should_pull_more_embeddings(query)
         if should_get_embeddings:
@@ -53,9 +134,9 @@ def handle_query(query: str):
             if len(embeddings) == 0:
                 logging.error("No matches found in vector database.")
                 return None
-            response = prompt_open_ai_with_embeddings([e["text"] for e in embeddings], query)
+            response = prompt_open_ai_with_embeddings([e["text"] for e in fact_sheet], [e["text"] for e in embeddings], query)
         else:
-            response = prompt_open_ai(query)
+            response = prompt_open_ai([e["text"] for e in fact_sheet], query)
 
         return {"result": response}
 
@@ -87,19 +168,23 @@ def get_cosmos_container():
 
 def get_system_prompt():
     return '''You are a CMS Regulation Analyst that analyzes pricing regulations and provides concise and accurate summaries of the regulations.  
-            When you provide a list or numbered output provide atleast 3 sentences describing each item.  
-            When you provide a list do not limit the number of items in the list.  Error on the side of too many items in the list.
-            Your main job is to assist the user with summarizing and providing interesting insights into the regulations.  
-            You are also expected to summarize content, when requested, for usage in social media posts.  When summarizing content for social media posts it is ok to use emoji's or graphics from outside the context of the conversation history.
-            When prompted to do math, double check your work to verify accuracy. 
-            When asked to provide page numbers look for the page number tag surrounding the text in the format of <Page {number}>{text}</Page {number}>'''
+            Adhere to these high level guides when responding: 
 
+            * You are NOT a counselor or personal care advisor.  DO NOT provide any self help, mental health, or physcial health advice.  Only respond in relation to the regulations you are summarizing. If the regulations you are summarizing involves details related to self-help, counseling, mental health, of physical health then it is premitted to respond in relation to the regulations.  
+            * When you provide a list or numbered output provide atleast 3 sentences describing each item.  
+            * When you provide a list do not limit the number of items in the list.  Error on the side of too many items in the list.
+            * When asked to provide a summary of changes be sure to include any content related to litigations or lawsuits. 
+            * Your main job is to assist the user with summarizing and providing interesting insights into the regulations.  
+            * You are also expected to summarize content, when requested, for usage in social media posts.  
+            * When summarizing content for social media posts it is ok to use emoji's or graphics from outside the context of the conversation history.
+            * When prompted to do math, double check your work to verify accuracy. 
+            * When asked to provide page numbers look for the page number tag surrounding the text in the format of <Page {number}>{text}</Page {number}>'''
 
 def search_embeddings(embedding: list[float], model_type):
     container = get_cosmos_container()
     items = []
     for item in container.query_items(
-        query="SELECT TOP 15 c.id, c.modelType, c.text, c.pageIndex, c.documentType, VectorDistance(c.vector, @embedding) as similiarityScore FROM c ORDER BY VectorDistance(c.vector, @embedding)",
+        query="SELECT TOP 10 c.id, c.modelType, c.text, c.pageIndex, c.documentType, VectorDistance(c.vector, @embedding) as similiarityScore FROM c ORDER BY VectorDistance(c.vector, @embedding)",
         parameters=[dict(
             name="@embedding", value=embedding
         )],
@@ -108,16 +193,67 @@ def search_embeddings(embedding: list[float], model_type):
         items.append({
             "id": item["id"],
             "modelType": item["modelType"],
-            "text": item["text"],
+            "text": item["text"].encode("utf-8").decode("utf-8"),
             "documentType": item["documentType"],
             "similiarityScore": item["similiarityScore"]
         })
+
+    logging.info(f'Embedding results found {len(items)}')
     return items
 
-def should_pull_more_embeddings(query: str):
-
+def should_pull_fact_sheet(query: str):
     historical_messages = get_history()
     if len(historical_messages) == 0:
+        logging.info('No history, pull the fact sheet')
+        return True
+    
+    openai_client = AzureOpenAI(
+        api_key = get_config("AZURE_OPENAI_API_KEY"),
+        api_version = "2024-02-01",
+        azure_endpoint = get_config("AZURE_OPENAI_ENDPOINT")
+    )
+    
+    messages = []
+
+    messages.append({
+        "role": "system",
+        "content": get_system_prompt()
+    })
+    
+    for message in historical_messages:
+        messages.append(message)
+
+    messages.append({
+        "role": "user",
+        "content": f'''
+            Only provide a simple "yes" or "no" in response to this question.  Always respond in all lower case. 
+
+            I have a high level summary of all the changes that are included in this data. Based on the below "Prompt", is the user asking for a general list of changes?
+            Please be very careful in how you respond and verify that the answer is the correct answer based on the conversaion history.  
+            I would only want to include this summary if it was not included recently in the conversation history and only if the user is specifically asking for a changes.
+
+            Prompt:
+            {query}
+        ''',
+    })  
+
+    logging.info('Determining if we should pull the fact sheet')
+
+    chat_completion = openai_client.chat.completions.create(
+        messages=messages,
+        model=get_config("ChatModel")
+    )
+
+    decision = chat_completion.choices[0].message.content
+
+    logging.info(f'Whether or not to include the fact sheet: {decision}')
+
+    return decision.lower().strip() == 'yes'
+
+def should_pull_more_embeddings(query: str):
+    historical_messages = get_history()
+    if len(historical_messages) == 0:
+        logging.info('No history, should pull more embeddings')
         return True
     
     openai_client = AzureOpenAI(
@@ -135,6 +271,8 @@ def should_pull_more_embeddings(query: str):
 
     for message in historical_messages:
         messages.append(message)
+
+    logging.info('Determining if we should pull more embeddings')
 
     messages.append({
                 "role": "user",
@@ -155,11 +293,36 @@ def should_pull_more_embeddings(query: str):
     )
 
     decision = chat_completion.choices[0].message.content
-    
-    #print(f'Initial embeddings question response "{decision}"')
 
+    logging.info(f'Whether or not to pull more embeddings: {decision}')
 
     return decision.lower().strip() == 'yes'
+
+def get_fact_sheet():    
+    selected_regulation = get_selected_regulation()
+    if not selected_regulation:
+        return []
+    
+    year = selected_regulation["year"]
+    model = selected_regulation["model"]
+    container = get_cosmos_container()
+    items = []
+
+    logging.info('Getting fact sheet')
+
+    for item in container.query_items(
+        query="SELECT TOP 15 c.id, c.modelType, c.text, c.pageIndex, c.documentType FROM c WHERE c.documentType = 'FactSheet' ORDER BY c.pageIndex ASC",
+        parameters=[],
+        partition_key=f'{model}_{year}'
+    ):
+        items.append({
+            "id": item["id"],
+            "modelType": item["modelType"],
+            "text": item["text"].encode("utf-8").decode("utf-8"),
+            "documentType": item["documentType"]
+        })
+
+    return items
 
 def query_embeddings(query: str):
     openai_client = AzureOpenAI(
@@ -169,20 +332,23 @@ def query_embeddings(query: str):
     )
 
     normalized_query = normalize_text(query)
+    logging.info('Normalized Query')
 
-    print(f'Normalized Query: {normalized_query}')
-
-    print('Generating query embeddings')
+    logging.info('Generating query embeddings')
     embeddings = generate_embeddings(openai_client, normalized_query)
 
-    year = get_config("Year")
-    model = get_config("Model")
+    selected_regulation = get_selected_regulation()
+    if not selected_regulation:
+        return []
+    
+    year = selected_regulation["year"]
+    model = selected_regulation["model"]
 
-    print("Searching Embeddings")
+    logging.info("Searching Embeddings")
     results = search_embeddings(embeddings, f'{model}_{year}')
 
     if len(results) == 0:
-        print('No matches found')
+        logging.info('No matches found')
         return []
     
     return results
@@ -199,6 +365,26 @@ def get_history():
             conversation_history.append(c)
     
     return conversation_history
+
+def get_supported_regulations():
+    container = get_cosmos_container()
+    supported_regulations = []
+
+    logging.info('Getting supported regulations')
+
+    for item in container.query_items(
+        query="SELECT TOP 1 c.regulations FROM c WHERE c.id = 'SupportedRegulations'",
+        parameters=[],
+        partition_key=f'Default'
+    ):
+        for regulation in item["regulations"]:
+            supported_regulations.append({
+                "model": regulation["model"],
+                "year": regulation["year"]
+            })
+
+    return supported_regulations
+
         
 def add_to_history(new_convo):
     existing_history = get_history()
@@ -209,17 +395,19 @@ def add_to_history(new_convo):
         history_json = json.dumps(existing_history)
         convo_writer.write(history_json)
 
-def prompt_open_ai_with_embeddings(embeddings: list[str], query: str):
+def prompt_open_ai_with_embeddings(fact_sheet_parts: list[str], embeddings: list[str], query: str):
     openai_client = AzureOpenAI(
         api_key = get_config("AZURE_OPENAI_API_KEY"),
         api_version = "2024-02-01",
         azure_endpoint = get_config("AZURE_OPENAI_ENDPOINT")
     )
 
+    logging.info('Calling OpenAI with embeddings')
+
     context = " ".join(embeddings)
 
     historical_messages = get_history()
-    
+
     messages = []
 
     messages.append({
@@ -230,28 +418,37 @@ def prompt_open_ai_with_embeddings(embeddings: list[str], query: str):
     for message in historical_messages:
         messages.append(message)
 
+    fact_sheet = " ".join(fact_sheet_parts)
+
+    fact_sheet_prompt = ''
+    if len(fact_sheet_parts) > 0:
+        fact_sheet_prompt = f'''
+            Fact Sheet:
+            {fact_sheet}
+        '''
     new_user_message = {
                 "role": "user",
                 "content": f'''
                     Only provide responses that can be found "Context:" provided below or from the "Context:" in previous messages based on the user's "Prompt:".  
-                    If you are unable to find a response in the below "Context:" or previous "Context:" do not make anything up.  Just response with "I'm not sure".
+                    If you are unable to find a response in the below "Context:" or previous "Context:" do not make anything up.  Just response with "I'm not sure how to help you with that.  I may not have been designed to help with your request.".
+                    If a "Fact Sheet:" is provided use that content to inform and focus the response. 
 
                     Prompt:
                     {query}
 
                     Context:
                     {context}
+
+                    {fact_sheet_prompt}
                 ''',
             }
 
-    messages.append(new_user_message)    
+    messages.append(new_user_message)
 
     chat_completion = openai_client.chat.completions.create(
         messages=messages,
         model=get_config("ChatModel")
     )
-
-    #print(chat_completion.choices[0].message.content)
 
     add_to_history([new_user_message, {
         "role": "assistant",
@@ -260,12 +457,14 @@ def prompt_open_ai_with_embeddings(embeddings: list[str], query: str):
 
     return chat_completion.choices[0].message.content
 
-def prompt_open_ai(query: str):
+def prompt_open_ai(fact_sheet_parts: list[str], query: str):
     openai_client = AzureOpenAI(
         api_key = get_config("AZURE_OPENAI_API_KEY"),
         api_version = "2024-02-01",
         azure_endpoint = get_config("AZURE_OPENAI_ENDPOINT")
     )
+
+    logging.info('Calling OpenAI without embeddings')
 
     historical_messages = get_history()
     
@@ -279,14 +478,25 @@ def prompt_open_ai(query: str):
     for message in historical_messages:
         messages.append(message)    
 
+    fact_sheet = " ".join(fact_sheet_parts)
+    fact_sheet_prompt = ''
+    if len(fact_sheet_parts) > 0:
+        fact_sheet_prompt = f'''
+            Fact Sheet:
+            {fact_sheet}
+        '''
+
     new_user_message = {
                 "role": "user",
                 "content": f'''
                     Only provide responses that can be found in the "Context:" of previous messages based on the user's "Prompt:".  
-                    If you are unable to find a response in the below "Context:" or previous "Context:" do not make anything up.  Just response with "I'm not sure".
+                    If you are unable to find a response in the below "Context:" or previous "Context:" do not make anything up.  Just response with "I'm not sure how to help you with that.  I may not have been designed to help with your request.".
+                    If a "Fact Sheet:" is provided use that content to inform and focus the response. 
 
                     Prompt:
                     {query}
+
+                    {fact_sheet_prompt}
                 ''',
             }
 
@@ -296,8 +506,6 @@ def prompt_open_ai(query: str):
         messages=messages,
         model=get_config("ChatModel")
     )
-
-    #print(chat_completion.choices[0].message.content)
 
     add_to_history([new_user_message, {
         "role": "assistant",

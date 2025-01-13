@@ -162,5 +162,6 @@ cython_debug/
 #.idea/
 
 convo_cache.json
+selected_regulation.json
 
 node_modules
