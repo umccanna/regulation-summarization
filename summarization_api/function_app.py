@@ -115,6 +115,7 @@ def ClearHistoryAPI(req: func.HttpRequest) -> func.HttpResponse:
 def get_selected_regulation():
     cache_path = Path('./conversation_history/selected_regulation.json')
     if not cache_path.exists():
+        logging.info('Selected regulation does not exist')
         return None
     
     with open(cache_path, 'r') as reader:
@@ -123,7 +124,7 @@ def get_selected_regulation():
 def handle_query(query: str):
     try:
         should_include_fact_sheet = should_pull_fact_sheet(query)
-        fact_sheet = []
+        fact_sheet = None
         if should_include_fact_sheet:
             fact_sheet = get_fact_sheet()
 
@@ -132,11 +133,12 @@ def handle_query(query: str):
         if should_get_embeddings:
             embeddings = query_embeddings(query)
             if len(embeddings) == 0:
-                logging.error("No matches found in vector database.")
-                return None
-            response = prompt_open_ai_with_embeddings([e["text"] for e in fact_sheet], [e["text"] for e in embeddings], query)
+                logging.error("No matches found in vector database. Querying without additional embeddings")
+                response = prompt_open_ai(fact_sheet, query)
+            else:
+                response = prompt_open_ai_with_embeddings(fact_sheet, [e["text"] for e in embeddings], query)
         else:
-            response = prompt_open_ai([e["text"] for e in fact_sheet], query)
+            response = prompt_open_ai(fact_sheet, query)
 
         return {"result": response}
 
@@ -322,7 +324,9 @@ def get_fact_sheet():
             "documentType": item["documentType"]
         })
 
-    return items
+    summarized_fact_sheet = summarize_text(' '.join([e["text"] for e in items]))
+
+    return summarized_fact_sheet
 
 def query_embeddings(query: str):
     openai_client = AzureOpenAI(
@@ -340,6 +344,8 @@ def query_embeddings(query: str):
     selected_regulation = get_selected_regulation()
     if not selected_regulation:
         return []
+    
+    logging.info(f'selected regulation {selected_regulation}')
     
     year = selected_regulation["year"]
     model = selected_regulation["model"]
@@ -395,7 +401,7 @@ def add_to_history(new_convo):
         history_json = json.dumps(existing_history)
         convo_writer.write(history_json)
 
-def prompt_open_ai_with_embeddings(fact_sheet_parts: list[str], embeddings: list[str], query: str):
+def prompt_open_ai_with_embeddings(fact_sheet: str, embeddings: list[str], query: str):
     openai_client = AzureOpenAI(
         api_key = get_config("AZURE_OPENAI_API_KEY"),
         api_version = "2024-02-01",
@@ -418,28 +424,34 @@ def prompt_open_ai_with_embeddings(fact_sheet_parts: list[str], embeddings: list
     for message in historical_messages:
         messages.append(message)
 
-    fact_sheet = " ".join(fact_sheet_parts)
-
     fact_sheet_prompt = ''
-    if len(fact_sheet_parts) > 0:
+    if fact_sheet:
         fact_sheet_prompt = f'''
             Fact Sheet:
             {fact_sheet}
         '''
+
+    new_user_message_content_pre_context = f'''
+        Only provide responses that can be found "Context:" provided below or from the "Context:" in any of the previous messages or any of your previous responses or any previous "Fact Sheet:" based on the user's "Prompt:" .  
+        If you are unable to find a response in the below "Context:" or any previous message "Context:" or any of your previous respsonses or any previous "Fact Sheet:" do not make anything up.  Just response with "I'm not sure how to help you with that.  I may not have been designed to help with your request.".
+        If a "Fact Sheet:" is provided use that content to inform and focus the response. 
+
+        Prompt:
+        {query}
+
+    '''
+
+    new_user_message_content_post_context = fact_sheet_prompt
+
     new_user_message = {
                 "role": "user",
                 "content": f'''
-                    Only provide responses that can be found "Context:" provided below or from the "Context:" in previous messages based on the user's "Prompt:".  
-                    If you are unable to find a response in the below "Context:" or previous "Context:" do not make anything up.  Just response with "I'm not sure how to help you with that.  I may not have been designed to help with your request.".
-                    If a "Fact Sheet:" is provided use that content to inform and focus the response. 
-
-                    Prompt:
-                    {query}
+                    {new_user_message_content_pre_context}
 
                     Context:
                     {context}
 
-                    {fact_sheet_prompt}
+                    {new_user_message_content_post_context}
                 ''',
             }
 
@@ -450,14 +462,61 @@ def prompt_open_ai_with_embeddings(fact_sheet_parts: list[str], embeddings: list
         model=get_config("ChatModel")
     )
 
+    response_content = chat_completion.choices[0].message.content
+
+    summarized_context = summarize_text(context)
+
+    logging.info(f'Summarized context: {summarized_context}')
+
+    new_user_message["content"] = f'''
+            {new_user_message_content_pre_context}
+
+            Context:
+            {summarized_context}
+
+            {new_user_message_content_post_context}
+        '''
+
     add_to_history([new_user_message, {
         "role": "assistant",
-        "content": chat_completion.choices[0].message.content
+        "content": response_content
     }])
+
+    return response_content
+
+def summarize_text(text: str):
+    openai_client = AzureOpenAI(
+        api_key = get_config("AZURE_OPENAI_API_KEY"),
+        api_version = "2024-02-01",
+        azure_endpoint = get_config("AZURE_OPENAI_ENDPOINT")
+    )
+
+    logging.info('Summarizing text')
+
+    chat_completion = openai_client.chat.completions.create(
+        messages=[
+            {
+                "role": "system",
+                "content": "You are a summarizing assistant.  Your goal is to capture the main idea of the content provided."
+            },
+            {
+                "role": "user",
+                "content": f'''
+                    Summarize the text provided in the "Text:" below.  Do not provide any additional information that is not related to the text provided. 
+                    Include page numbers from "Text:".  Page numbers are denoted in the format <Page number>text</Page number>.
+                    Pay special attention to any factors, payments, or decimal values and be sure they are included in the summary.
+
+                    {text}
+                '''
+            }
+        ],
+        model=get_config("ChatModel")
+    )
 
     return chat_completion.choices[0].message.content
 
-def prompt_open_ai(fact_sheet_parts: list[str], query: str):
+
+def prompt_open_ai(fact_sheet: str, query: str):
     openai_client = AzureOpenAI(
         api_key = get_config("AZURE_OPENAI_API_KEY"),
         api_version = "2024-02-01",
@@ -478,9 +537,8 @@ def prompt_open_ai(fact_sheet_parts: list[str], query: str):
     for message in historical_messages:
         messages.append(message)    
 
-    fact_sheet = " ".join(fact_sheet_parts)
     fact_sheet_prompt = ''
-    if len(fact_sheet_parts) > 0:
+    if fact_sheet:
         fact_sheet_prompt = f'''
             Fact Sheet:
             {fact_sheet}
@@ -489,8 +547,8 @@ def prompt_open_ai(fact_sheet_parts: list[str], query: str):
     new_user_message = {
                 "role": "user",
                 "content": f'''
-                    Only provide responses that can be found in the "Context:" of previous messages based on the user's "Prompt:".  
-                    If you are unable to find a response in the below "Context:" or previous "Context:" do not make anything up.  Just response with "I'm not sure how to help you with that.  I may not have been designed to help with your request.".
+                    Only provide responses that can be found in any previous message "Context:" or any previous message "Fact Sheet:" or any of previous your responses based on the user's "Prompt:".
+                    If you are unable to find a response in any previous message "Context:" or any previous message "Fact Sheet:" or any of your previous responses do not make anything up.  Just response with "I'm not sure how to help you with that.  I may not have been designed to help with your request.".
                     If a "Fact Sheet:" is provided use that content to inform and focus the response. 
 
                     Prompt:
