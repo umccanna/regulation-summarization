@@ -51,19 +51,24 @@ def GetSupportedRegulationsAPI(req: func.HttpRequest) -> func.HttpResponse:
 def SetRegulationsAPI(req: func.HttpRequest) -> func.HttpResponse:
     try:
         req_body = req.get_json()
-        model = req_body.get('model')
-        year = req_body.get('year')
+        parition_key = req_body.get('partitionKey')
 
-        if not model or not year:
+        if not parition_key:
             return func.HttpResponse(
-                "Request body must include 'model' and 'year'",
+                "Request body must contain a partitionKey",
                 status_code=400
             )
 
         regulations = get_supported_regulations()
-        if not any(r for r in regulations if r["model"] == model and r["year"] == year):
+        matching_regulation = None
+        for r in regulations:
+            if r["partitionKey"] == parition_key:
+                matching_regulation = r
+                break
+        
+        if not matching_regulation:
             return func.HttpResponse(
-                "Invalid model and year combination",
+                "Unsupported selection",
                 status_code=400
             )
 
@@ -71,7 +76,7 @@ def SetRegulationsAPI(req: func.HttpRequest) -> func.HttpResponse:
 
         cache_path = Path('./conversation_history/selected_regulation.json')
         with open(cache_path, 'w', encoding='utf-8') as writer:
-            json.dump({"model": model, "year": year}, writer)
+            json.dump(matching_regulation, writer)
 
         return func.HttpResponse(status_code=200)
 
@@ -123,10 +128,13 @@ def get_selected_regulation():
 
 def handle_query(query: str):
     try:
-        should_include_fact_sheet = should_pull_fact_sheet(query)
+        selected_regulation = get_selected_regulation()
+
         fact_sheet = None
-        if should_include_fact_sheet:
-            fact_sheet = get_fact_sheet()
+        if selected_regulation["hasFACTSheet"]:
+            should_include_fact_sheet = should_pull_fact_sheet(query)
+            if should_include_fact_sheet:
+                fact_sheet = get_fact_sheet()
 
         # Based on CLI's main function logic
         should_get_embeddings = should_pull_more_embeddings(query)
@@ -169,18 +177,30 @@ def get_cosmos_container():
     return container
 
 def get_system_prompt():
-    return '''You are a CMS Regulation Analyst that analyzes pricing regulations and provides concise and accurate summaries of the regulations.  
-            Adhere to these high level guides when responding: 
+    selected_regulation = get_selected_regulation()
+    if selected_regulation["hasFACTSheet"]:
+        return '''You are a CMS Regulation Analyst that analyzes pricing regulations and provides concise and accurate summaries of the regulations.  
+                Adhere to these high level guides when responding: 
 
-            * You are NOT a counselor or personal care advisor.  DO NOT provide any self help, mental health, or physcial health advice.  Only respond in relation to the regulations you are summarizing. If the regulations you are summarizing involves details related to self-help, counseling, mental health, of physical health then it is premitted to respond in relation to the regulations.  
-            * When you provide a list or numbered output provide atleast 3 sentences describing each item.  
-            * When you provide a list do not limit the number of items in the list.  Error on the side of too many items in the list.
-            * When asked to provide a summary of changes be sure to include any content related to litigations or lawsuits. 
-            * Your main job is to assist the user with summarizing and providing interesting insights into the regulations.  
-            * You are also expected to summarize content, when requested, for usage in social media posts.  
-            * When summarizing content for social media posts it is ok to use emoji's or graphics from outside the context of the conversation history.
-            * When prompted to do math, double check your work to verify accuracy. 
-            * When asked to provide page numbers look for the page number tag surrounding the text in the format of <Page {number}>{text}</Page {number}>'''
+                * You are NOT a counselor or personal care advisor.  DO NOT provide any self help, mental health, or physcial health advice.  Only respond in relation to the regulations you are summarizing. If the regulations you are summarizing involves details related to self-help, counseling, mental health, of physical health then it is premitted to respond in relation to the regulations.  
+                * When you provide a list or numbered output provide atleast 3 sentences describing each item.  
+                * When you provide a list do not limit the number of items in the list.  Error on the side of too many items in the list.
+                * When asked to provide a summary of changes be sure to include any content related to litigations or lawsuits. 
+                * Your main job is to assist the user with summarizing and providing interesting insights into the regulations.  
+                * You are also expected to summarize content, when requested, for usage in social media posts.  
+                * When summarizing content for social media posts it is ok to use emoji's or graphics from outside the context of the conversation history.
+                * When prompted to do math, double check your work to verify accuracy. 
+                * When asked to provide page numbers look for the page number tag surrounding the text in the format of <Page {number}>{text}</Page {number}>'''
+    
+    return '''You are an Analyst that analyzes documents and provides concise and accurate summaries of the documents.  
+        Adhere to these high level guides when responding: 
+
+        * You are NOT a counselor or personal care advisor.  DO NOT provide any self help, mental health, or physcial health advice.  Only respond in relation to the document you are summarizing. If the document you are summarizing involves details related to self-help, counseling, mental health, of physical health then it is premitted to respond in relation to the document.  
+        * When you provide a list or numbered output provide atleast 3 sentences describing each item.  
+        * When you provide a list do not limit the number of items in the list.  Error on the side of too many items in the list.
+        * Your main job is to assist the user with summarizing and providing interesting insights into the documents.  
+        * When prompted to do math, double check your work to verify accuracy. 
+        * When asked to provide page numbers look for the page number tag surrounding the text in the format of <Page {number}>{text}</Page {number}>'''
 
 def search_embeddings(embedding: list[float], model_type):
     container = get_cosmos_container()
@@ -303,10 +323,13 @@ def should_pull_more_embeddings(query: str):
 def get_fact_sheet():    
     selected_regulation = get_selected_regulation()
     if not selected_regulation:
-        return []
+        return None
     
-    year = selected_regulation["year"]
-    model = selected_regulation["model"]
+    partition_key = selected_regulation["partitionKey"]
+    has_fact_sheet = selected_regulation["hasFACTSheet"]
+    if not has_fact_sheet:
+        return None
+
     container = get_cosmos_container()
     items = []
 
@@ -315,7 +338,7 @@ def get_fact_sheet():
     for item in container.query_items(
         query="SELECT TOP 15 c.id, c.modelType, c.text, c.pageIndex, c.documentType FROM c WHERE c.documentType = 'FactSheet' ORDER BY c.pageIndex ASC",
         parameters=[],
-        partition_key=f'{model}_{year}'
+        partition_key=partition_key
     ):
         items.append({
             "id": item["id"],
@@ -347,11 +370,10 @@ def query_embeddings(query: str):
     
     logging.info(f'selected regulation {selected_regulation}')
     
-    year = selected_regulation["year"]
-    model = selected_regulation["model"]
+    partition_key = selected_regulation["partitionKey"]
 
     logging.info("Searching Embeddings")
-    results = search_embeddings(embeddings, f'{model}_{year}')
+    results = search_embeddings(embeddings, partition_key)
 
     if len(results) == 0:
         logging.info('No matches found')
@@ -385,8 +407,9 @@ def get_supported_regulations():
     ):
         for regulation in item["regulations"]:
             supported_regulations.append({
-                "model": regulation["model"],
-                "year": regulation["year"]
+                "partitionKey": regulation["partitionKey"],
+                "title": regulation["title"],
+                "hasFACTSheet": regulation["hasFACTSheet"]
             })
 
     return supported_regulations

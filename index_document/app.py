@@ -72,17 +72,15 @@ def upload_fact_sheet():
 
             embeddings = generate_embeddings(openai_client, normalized_page_text)
 
-            year = get_config("Year")
-            model = get_config("Model")
+            partition_key = get_config("PartitionKey")
             print(f"Saving page {i+1}")
-            create_document(cosmos_container, normalized_page_text, embeddings, i, f"{model}_{year}", "FactSheet")
+            create_document(cosmos_container, normalized_page_text, embeddings, i, partition_key, "FactSheet")
 
 def delete_document_type(document_type: str):
     print(f'Deleting document {document_type}')
     cosmos_container = get_cosmos_container()
-    year = get_config("Year")
-    model = get_config("Model")
-    partition_key = f"{model}_{year}"
+    partition_key = get_config("PartitionKey")
+    partition_key = partition_key
     query = f"SELECT * FROM c WHERE c.partitionKey = '{partition_key}' AND c.documentType = '{document_type}'"
     items = cosmos_container.query_items(query=query, enable_cross_partition_query=False)
     deleted_count = 0
@@ -188,11 +186,10 @@ def overlap_and_upload_chunks(cosmos_container, chunk_accumulator, overlap_size,
         chunked_data = joining_character.join(chunks)
 
         embeddings = generate_embeddings(openai_client, chunked_data)
-
-        year = get_config("Year")
-        model = get_config("Model")
+        
+        partition_key = get_config("PartitionKey")
         print(f"Saving chunk {i+1+total_already_uploaded} of {total_chunks}")
-        create_document(cosmos_container, chunked_data, embeddings, i+total_already_uploaded, f"{model}_{year}", "FinalRuling")
+        create_document(cosmos_container, chunked_data, embeddings, i+total_already_uploaded, partition_key, "FinalRuling")
 
 def main():
     try:

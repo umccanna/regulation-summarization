@@ -295,7 +295,7 @@
             regulations.forEach(reg => {
                 const button = document.createElement('button');
                 button.className = 'w-full p-2 text-left hover:bg-gray-100 rounded';
-                button.textContent = `${reg.model} - ${reg.year}`;
+                button.textContent = reg.title;
                 button.onclick = () => selectRegulation(reg);
                 container.appendChild(button);
             });
@@ -335,7 +335,7 @@
         function displaySelectedRegulation(regulation) {
             const display = document.getElementById('selected-regulation');
             const changeButton = document.getElementById('change-regulation');
-            display.textContent = `Selected: ${regulation.model} - ${regulation.year}`;
+            display.textContent = `Selected: ${regulation.title}`;
             changeButton.style.display = 'block';
         }
 
