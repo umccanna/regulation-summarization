@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -22,13 +23,29 @@
             animation: typing-bounce 1.4s infinite ease-in-out;
         }
 
-        .typing-dot:nth-child(1) { animation-delay: 0s; }
-        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
-        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+        .typing-dot:nth-child(1) {
+            animation-delay: 0s;
+        }
+
+        .typing-dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing-dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
 
         @keyframes typing-bounce {
-            0%, 80%, 100% { transform: translateY(0); }
-            40% { transform: translateY(-8px); }
+
+            0%,
+            80%,
+            100% {
+                transform: translateY(0);
+            }
+
+            40% {
+                transform: translateY(-8px);
+            }
         }
 
         @media (min-height: 800px) {
@@ -48,6 +65,7 @@
         }
     </style>
 </head>
+
 <body class="bg-gray-100 min-h-screen">
     <div class="container mx-auto px-4 py-8 max-w-4xl">
         <div class="bg-white rounded-lg shadow-lg p-6 chat-container flex flex-col">
@@ -56,33 +74,28 @@
                     <h1 class="text-xl font-semibold">Chat Interface</h1>
                     <div class="flex items-center gap-2">
                         <div id="selected-regulation" class="text-sm text-gray-600"></div>
-                        <button 
-                            id="change-regulation"
-                            class="text-sm text-blue-500 hover:text-blue-700"
-                            style="display: none;"
-                        >
+                        <button id="change-regulation" class="text-sm text-blue-500 hover:text-blue-700"
+                            style="display: none;">
                             Change
                         </button>
                     </div>
                 </div>
-                <button 
-                    id="reset-button"
-                    class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition-colors"
-                >
+                <button id="reset-button"
+                    class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition-colors">
                     Reset Chat
                 </button>
             </div>
 
-            <div id="regulation-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
+            <div id="regulation-modal"
+                class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
                 <div class="bg-white p-6 rounded-lg max-w-md w-full">
                     <div class="flex justify-between items-center mb-4">
                         <h2 class="text-lg font-semibold">Select Regulation</h2>
-                        <button 
-                            id="close-regulation-modal"
-                            class="text-gray-500 hover:text-gray-700 hidden"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        <button id="close-regulation-modal" class="text-gray-500 hover:text-gray-700 hidden">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M6 18L18 6M6 6l12 12" />
                             </svg>
                         </button>
                     </div>
@@ -104,20 +117,11 @@
             </div>
 
             <form id="chat-form" class="flex gap-2 pt-4 border-t">
-                <input 
-                    type="text" 
-                    id="user-input" 
+                <input type="text" id="user-input"
                     class="flex-1 p-3 border rounded focus:outline-none focus:border-blue-500"
-                    placeholder="Type your message..."
-                    required
-                    disabled
-                >
-                <button 
-                    type="submit"
-                    id="send-button"
-                    class="bg-blue-500 text-white px-6 py-3 rounded hover:bg-blue-600 transition-colors"
-                    disabled
-                >
+                    placeholder="Type your message..." required disabled>
+                <button type="submit" id="send-button"
+                    class="bg-blue-500 text-white px-6 py-3 rounded hover:bg-blue-600 transition-colors" disabled>
                     Send
                 </button>
             </form>
@@ -142,6 +146,8 @@
         const resetButton = document.getElementById('reset-button');
         const typingTemplate = document.getElementById('typing-template');
         const closeButton = document.getElementById('close-regulation-modal');
+        let currentConversationId = null;
+        const userId = getOrCreateUserId();
 
         marked.setOptions({
             breaks: true,
@@ -152,8 +158,8 @@
 
         function addMessage(content, isUser = false) {
             const messageDiv = document.createElement('div');
-            messageDiv.className = isUser ? 
-                'bg-blue-50 p-4 rounded' : 
+            messageDiv.className = isUser ?
+                'bg-blue-50 p-4 rounded' :
                 'bg-gray-50 p-4 rounded message-content';
 
             if (isUser) {
@@ -176,60 +182,63 @@
             return chatMessages.lastElementChild;
         }
 
+        function getOrCreateUserId() {
+            const existingUserId = localStorage.getItem("userId");
+            if (existingUserId) {
+                return existingUserId;
+            }
+
+            const generatedUserId = crypto.randomUUID();
+            localStorage.setItem("userId", generatedUserId);
+            return generatedUserId;
+        }
+
         function removeTypingIndicator(indicator) {
             if (indicator && indicator.parentNode) {
                 indicator.remove();
             }
         }
 
-        function clearChat() {
+        function newChat() {
             while (chatMessages.children.length > 1) {
                 chatMessages.removeChild(chatMessages.lastChild);
             }
+            currentConversationId = null;
             userInput.value = '';
             userInput.focus();
         }
 
-        async function resetConversation() {
-            try {
-                resetButton.disabled = true;
-                userInput.disabled = true;
-                sendButton.disabled = true;
-
-                const response = await fetch('http://localhost:7071/api/clear', {
-                    method: 'POST'
-                });
-
-                if (!response.ok) {
-                    throw new Error('Failed to reset conversation');
-                }
-
-                clearChat();
-            } catch (error) {
-                addMessage('Sorry, there was an error resetting the conversation. Please try again.');
-                console.error('Error:', error);
-            } finally {
-                resetButton.disabled = false;
-                userInput.disabled = false;
-                sendButton.disabled = false;
-            }
+        function resetConversation() {
+            newChat();
         }
 
         async function sendMessage(message) {
             userInput.disabled = true;
             sendButton.disabled = true;
             resetButton.disabled = true;
-            
-            const typingIndicator = showTypingIndicator();
 
+            const typingIndicator = showTypingIndicator();
+            const selectedRegulation = getSelectedRegulation();
             try {
-                const response = await fetch(`http://localhost:7071/api/summarize?query=${encodeURIComponent(message)}`);
+                const response = await fetch('http://localhost:7071/api/summarize', {
+                    method: 'POST',
+                    headers: {
+                        "Content-Type": 'application/json'
+                    },
+                    body: JSON.stringify({
+                        userId,
+                        conversationId: currentConversationId,
+                        query: message,
+                        regulation: selectedRegulation.partitionKey
+                    })
+                });
                 if (!response.ok) {
                     throw new Error('API request failed');
                 }
                 const data = await response.json();
-                
+
                 removeTypingIndicator(typingIndicator);
+                currentConversationId = data.conversationId;
                 addMessage(data.result);
             } catch (error) {
                 removeTypingIndicator(typingIndicator);
@@ -243,36 +252,27 @@
             }
         }
 
-        async function checkSelectedRegulation() {
-            try {
-                const response = await fetch('http://localhost:7071/api/regulations/selected');
-                const hasRegulation = response.status !== 404;
-                closeButton.classList.toggle('hidden', !hasRegulation);
-                
-                if (response.status === 404) {
-                    showRegulationModal();
-                    return false;
-                }
-                if (!response.ok) {
-                    throw new Error('Failed to get selected regulation');
-                }
-                const regulation = await response.json();
-                displaySelectedRegulation(regulation);
-                enableChat();
-                return true;
-            } catch (error) {
-                console.error('Error checking regulation:', error);
+        function checkSelectedRegulation() {
+            const selectedRegulation = getSelectedRegulation();
+            closeButton.classList.toggle('hidden', selectedRegulation ? false : true);
+
+            if (!selectedRegulation) {
+                showRegulationModal();
                 return false;
             }
+
+            displaySelectedRegulation(selectedRegulation);
+            enableChat();
+            return true;
         }
 
         async function loadRegulations() {
             const loadingIndicator = document.getElementById('regulation-loading');
             const regulationList = document.getElementById('regulation-list');
-            
+
             loadingIndicator.classList.remove('hidden');
             regulationList.classList.add('hidden');
-            
+
             try {
                 const response = await fetch('http://localhost:7071/api/regulations');
                 if (!response.ok) {
@@ -291,46 +291,60 @@
         function displayRegulationsList(regulations) {
             const container = document.getElementById('regulation-list');
             container.innerHTML = '';
-            
+
             regulations.forEach(reg => {
                 const button = document.createElement('button');
                 button.className = 'w-full p-2 text-left hover:bg-gray-100 rounded';
                 button.textContent = reg.title;
-                button.onclick = () => selectRegulation(reg);
+                button.onclick = () => setSelectedRegulation(reg);
                 container.appendChild(button);
             });
         }
 
-        async function selectRegulation(regulation) {
-            try {
-                const button = event.target;
-                const originalText = button.textContent;
-                button.disabled = true;
-                button.innerHTML = '<div class="animate-spin inline-block w-4 h-4 border-2 border-b-transparent border-blue-500 rounded-full"></div>';
-                
-                const response = await fetch('http://localhost:7071/api/regulations', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(regulation)
-                });
+        function setSelectedRegulation(regulation) {
+            localStorage.setItem('selectedRegulation', JSON.stringify(regulation));
 
-                if (!response.ok) {
-                    throw new Error('Failed to set regulation');
-                }
-
-                displaySelectedRegulation(regulation);
-                hideRegulationModal();
-                enableChat();
-                clearChat();
-            } catch (error) {
-                console.error('Error setting regulation:', error);
-            } finally {
-                button.disabled = false;
-                button.textContent = originalText;
-            }
+            displaySelectedRegulation(regulation);
+            hideRegulationModal();
+            enableChat();
+            newChat();
         }
+
+        function getSelectedRegulation() {
+            const regulationString = localStorage.getItem('selectedRegulation');
+            return regulationString && JSON.parse(regulationString);
+        }
+
+        // async function selectRegulation(regulation) {
+        //     try {
+        //         const button = event.target;
+        //         const originalText = button.textContent;
+        //         button.disabled = true;
+        //         button.innerHTML = '<div class="animate-spin inline-block w-4 h-4 border-2 border-b-transparent border-blue-500 rounded-full"></div>';
+
+        //         const response = await fetch('http://localhost:7071/api/regulations', {
+        //             method: 'POST',
+        //             headers: {
+        //                 'Content-Type': 'application/json',
+        //             },
+        //             body: JSON.stringify(regulation)
+        //         });
+
+        //         if (!response.ok) {
+        //             throw new Error('Failed to set regulation');
+        //         }
+
+        //         displaySelectedRegulation(regulation);
+        //         hideRegulationModal();
+        //         enableChat();
+        //         clearChat();
+        //     } catch (error) {
+        //         console.error('Error setting regulation:', error);
+        //     } finally {
+        //         button.disabled = false;
+        //         button.textContent = originalText;
+        //     }
+        // }
 
         function displaySelectedRegulation(regulation) {
             const display = document.getElementById('selected-regulation');
@@ -389,8 +403,9 @@
 
         resetButton.addEventListener('click', resetConversation);
         closeButton.addEventListener('click', hideRegulationModal);
-        
+
         init();
     </script>
 </body>
+
 </html>
