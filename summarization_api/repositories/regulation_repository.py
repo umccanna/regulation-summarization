@@ -13,8 +13,6 @@ class RegulationRepository:
     def get_available_regulations(self):
         available_regulations = []
 
-        logging.info('Getting available regulations')
-
         container = self.__database.get_container_client("pricingregulations")
         for item in container.query_items(
             query="SELECT TOP 1 c.regulations FROM c WHERE c.id = 'SupportedRegulations'",
@@ -124,13 +122,12 @@ class RegulationRepository:
         container = self.__database.get_container_client("conversations")
         conversation_log = []
         for item in container.query_items(
-            query="SELECT c.promptRaw, c.contextSummarized, c.factSheet, c.response, c.directions, c.sequence, c.created FROM c WHERE c.id = @ConversationId AND c.type = 'ConversationLog' ORDER BY c.sequence ASC",
+            query="SELECT c.promptRaw, c.contextSummarized, c.factSheet, c.response, c.directions, c.sequence, c.created FROM c WHERE c.conversationId = @ConversationId AND c.type = 'ConversationLog' ORDER BY c.sequence ASC",
             parameters=[{"name":"@ConversationId", "value": conversation_id}],
             partition_key=user_id
         ):
             conversation_log.append({
                 "promptRaw": item["promptRaw"],
-                "contextRaw": item["contextRaw"],
                 "contextSummarized": item["contextSummarized"],
                 "factSheet": item["factSheet"],
                 "response": item["response"],
@@ -184,7 +181,7 @@ class RegulationRepository:
                 "factSheet": request["factSheet"],
                 "sequence": conversation_item["sequenceCount"]+1,
                 "directions": request["directions"],
-                "reponse": request["response"],
+                "response": request["response"],
                 "type": "ConversationLog",
                 "created": str(datetime.datetime.now(timezone.utc))
             }, ), {})

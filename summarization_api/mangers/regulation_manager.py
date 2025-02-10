@@ -76,7 +76,6 @@ class RegulationManager:
     def query_regulation(self, request):
         try:
             selected_regulation = self.__get_matching_regulation(request["regulation"])
-            logging.info(f'Matching regulation {selected_regulation}')
 
             conversation = self.__regulation_repository.get_conversation(request["userId"], request["conversationId"]) if request["conversationId"] else None
             if not conversation:
@@ -84,8 +83,20 @@ class RegulationManager:
                 conversation = self.__regulation_repository.create_conversation(request["userId"], summarized_query, request["regulation"])
 
             ai_formatted_conversation_history = self.__convert_conversation_history_to_ai_format(conversation["log"])
+            already_has_fact_sheet = False
+            for log in conversation["log"]:
+                if log["factSheet"]:
+                    already_has_fact_sheet = True
+                    break
+            
+            
+            if already_has_fact_sheet:
+                logging.info("Fact sheet already in conversation")
+            else:
+                logging.info("No fact sheet found in conversation history")
+
             fact_sheet = None
-            if selected_regulation["hasFACTSheet"]:
+            if selected_regulation["hasFACTSheet"] and not already_has_fact_sheet:
                 should_include_fact_sheet = self.__ai_service.should_pull_fact_sheet(request["query"], ai_formatted_conversation_history, selected_regulation)
                 if should_include_fact_sheet:
                     fact_sheet = self.__regulation_repository.get_fact_sheet(selected_regulation)

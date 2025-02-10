@@ -108,10 +108,11 @@ class AIService:
                     "role": "user",
                     "content": f'''
                         Summarize the text provided in the "Text:" below.  Do not provide any additional information that is not related to the text provided. 
-                        Include page numbers from "Text:".  Page numbers are denoted in the format <Page number>text</Page number>.
+                        Include page numbers from "Text:", if there are any referenced.  Page numbers are denoted in the format <Page number>text</Page number>.
                         Pay special attention to any factors, payments, or decimal values and be sure they are included in the summary.
                         If a "Max Length:" is provided then strictly limit the summary to the "Max Length:" even if that means ignoring page numbers or special numbers.
 
+                        Text:
                         {text}
                     '''
                 }
