@@ -183,14 +183,14 @@
         const elapsedTime = formatElapsedTime(new Date(conv.updated));
         const item = document.createElement('div');
         item.className = 'p-3 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors cursor-pointer';
-        item.dataset.conversationId = conv.conversationId; // for highlighting
+        item.dataset.conversationId = conv.id; // for highlighting
 
         item.innerHTML = `
           <strong>${conv.name}</strong> (${conv.regulation})<br>
           <span class="text-gray-600">Updated: ${elapsedTime} ago</span> |
           <span class="text-gray-600">${conv.sequenceCount} messages</span>
         `;
-        item.addEventListener('click', () => loadConversation(conv.conversationId));
+        item.addEventListener('click', () => loadConversation(conv.id));
         conversationList.appendChild(item);
       });
     }
@@ -356,18 +356,24 @@
         }
 
         const messages = await response.json();
-        // Sort by sequence ascending
-        messages.sort((a, b) => a.sequence - b.sequence);
 
         // Clear the chat entirely (including welcome message)
         chatMessages.innerHTML = '';
 
-        // Replay all conversation messages
-        for (const msg of messages) {
-          // The user typed 'promptRaw'
-          addMessage(msg.promptRaw, true);
-          // The response is from the system
-          addMessage(msg.response, false);
+        // Check if the conversation contains a log
+        if (messages.log && messages.log.length > 0) {
+          // Sort messages by sequence order
+          messages.log.sort((a, b) => a.sequence - b.sequence);
+
+          // Display all messages in order
+          for (const msg of messages.log) {
+            // Display user prompt
+            addMessage(msg.promptRaw, true);
+            // Display system response
+            addMessage(msg.response, false);
+          }
+        } else {
+          addMessage('No messages found in this conversation.', false);
         }
 
         // Update currentConversationId
