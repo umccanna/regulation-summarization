@@ -1,6 +1,8 @@
 import azure.functions as func
 import json
 from mangers.regulation_manager import RegulationManager
+from repositories.regulation_repository import RegulationRepository
+
 
 app = func.FunctionApp()
 
@@ -72,6 +74,37 @@ def GetConversationListsAPI(req: func.HttpRequest) -> func.HttpResponse:
         status_code=200,
         mimetype="application/json"
     ) 
+
+@app.route(route="conversations/load", auth_level=func.AuthLevel.ANONYMOUS, methods=["POST"])
+def GetConversationAPI(req: func.HttpRequest) -> func.HttpResponse:
+    try:
+        req_body = req.get_json()
+        user_id = req_body.get("userId")
+        conversation_id = req_body.get("conversationId")
+
+        if not user_id:
+            return func.HttpResponse("User Id is required", status_code=400)
+
+        if not conversation_id:
+            return func.HttpResponse("Conversation Id is required", status_code=400)
+
+        repository = RegulationRepository()
+        conversation = repository.get_conversation(user_id, conversation_id)
+
+        if conversation is None:
+            return func.HttpResponse("Conversation not found", status_code=404)
+
+        return func.HttpResponse(
+            json.dumps(conversation),
+            status_code=200,
+            mimetype="application/json"
+        )
+
+    except Exception as e:
+        return func.HttpResponse(
+            f"Error retrieving conversation: {str(e)}",
+            status_code=500
+        )
     
 @app.route(route="regulations", auth_level=func.AuthLevel.ANONYMOUS, methods=["GET"])
 def GetSupportedRegulationsAPI(req: func.HttpRequest) -> func.HttpResponse:
