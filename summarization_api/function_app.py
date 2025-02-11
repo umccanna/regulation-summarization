@@ -52,6 +52,27 @@ def SummarizationAPI(req: func.HttpRequest) -> func.HttpResponse:
             status_code=500
         )
     
+@app.route(route="conversations/list", auth_level=func.AuthLevel.ANONYMOUS, methods=["POST"])
+def GetConversationListsAPI(req: func.HttpRequest) -> func.HttpResponse:
+    req_body = req.get_json()
+
+    user_id = req_body["userId"]
+    
+    if not user_id:
+        return func.HttpResponse(
+            "User Id is required",
+            status_code=400
+        )
+
+    manager = RegulationManager()
+    conversations = manager.get_conversations(user_id)
+
+    return func.HttpResponse(
+        json.dumps(conversations),
+        status_code=200,
+        mimetype="application/json"
+    ) 
+    
 @app.route(route="regulations", auth_level=func.AuthLevel.ANONYMOUS, methods=["GET"])
 def GetSupportedRegulationsAPI(req: func.HttpRequest) -> func.HttpResponse:
     manager = RegulationManager()

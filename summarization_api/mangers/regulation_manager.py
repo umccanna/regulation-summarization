@@ -17,6 +17,9 @@ class RegulationManager:
     
     def get_available_regulations(self):
         return self.__regulation_repository.get_available_regulations()
+    
+    def get_conversations(self, user_id):
+        return self.__regulation_repository.get_conversations(user_id)
 
     def __convert_conversation_history_to_ai_format(self, conversation_log: list):
         converted_history = []
