@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Chat Interface</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
@@ -13,7 +13,6 @@
       gap: 4px;
       padding: 12px;
     }
-
     .typing-dot {
       width: 8px;
       height: 8px;
@@ -21,42 +20,33 @@
       border-radius: 50%;
       animation: typing-bounce 1.4s infinite ease-in-out;
     }
-
     .typing-dot:nth-child(1) {
       animation-delay: 0s;
     }
-
     .typing-dot:nth-child(2) {
       animation-delay: 0.2s;
     }
-
     .typing-dot:nth-child(3) {
       animation-delay: 0.4s;
     }
-
     @keyframes typing-bounce {
-      0%, 80%, 100% {
-        transform: translateY(0);
-      }
-      40% {
-        transform: translateY(-8px);
-      }
+      0%, 80%, 100% { transform: translateY(0); }
+      40% { transform: translateY(-8px); }
     }
-
     @media (min-height: 800px) {
-      .chat-container {
-        height: 80vh;
-      }
+      .chat-container { height: 80vh; }
     }
-
     .message-content ol {
       list-style-type: decimal;
       padding-left: 2.5rem;
       margin: 1rem 0;
     }
-
     .message-content li {
       margin-bottom: 0.5rem;
+    }
+    /* Highlight style for active conversation */
+    .active-conversation {
+      background-color: #bfdbfe !important; /* Tailwind's bg-blue-200 */
     }
   </style>
 </head>
@@ -84,8 +74,7 @@
               </button>
             </div>
           </div>
-          <button id="reset-button"
-            class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition-colors">
+          <button id="reset-button" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition-colors">
             Reset Chat
           </button>
         </div>
@@ -95,7 +84,8 @@
             <div class="flex justify-between items-center mb-4">
               <h2 class="text-lg font-semibold">Select Regulation</h2>
               <button id="close-regulation-modal" class="text-gray-500 hover:text-gray-700 hidden">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
+                     stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -113,17 +103,27 @@
         </div>
 
         <div id="chat-messages" class="flex-1 space-y-4 overflow-y-auto mb-4" style="min-height: 500px;">
+          <!-- This is your initial "welcome" message -->
           <div class="bg-blue-100 p-4 rounded">
             <p>Welcome! How can I help you today?</p>
           </div>
         </div>
 
         <form id="chat-form" class="flex gap-2 pt-4 border-t">
-          <input type="text" id="user-input"
-                 class="flex-1 p-3 border rounded focus:outline-none focus:border-blue-500"
-                 placeholder="Type your message..." required disabled>
-          <button type="submit" id="send-button"
-                  class="bg-blue-500 text-white px-6 py-3 rounded hover:bg-blue-600 transition-colors" disabled>
+          <input
+            type="text"
+            id="user-input"
+            class="flex-1 p-3 border rounded focus:outline-none focus:border-blue-500"
+            placeholder="Type your message..."
+            required
+            disabled
+          />
+          <button
+            type="submit"
+            id="send-button"
+            class="bg-blue-500 text-white px-6 py-3 rounded hover:bg-blue-600 transition-colors"
+            disabled
+          >
             Send
           </button>
         </form>
@@ -143,14 +143,10 @@
   </template>
 
   <script>
-    /* -------------------------- Conversation List Logic -------------------------- */
+    /* -------------------------------------------------------------------------- */
+    /*                            Conversation List Logic                          */
+    /* -------------------------------------------------------------------------- */
     const conversationList = document.getElementById('conversation-list');
-    const userId = getOrCreateUserId();
-
-    document.addEventListener('DOMContentLoaded', async () => {
-      // Fetch conversation history on load
-      await fetchConversationHistory();
-    });
 
     async function fetchConversationHistory() {
       try {
@@ -159,7 +155,6 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId })
         });
-
         if (!response.ok) throw new Error('Failed to load conversations');
 
         let conversations = await response.json();
@@ -170,6 +165,7 @@
         );
 
         displayConversations(conversations);
+        highlightActiveConversation(); // highlight conversation if it matches the current ID
       } catch (error) {
         console.error('Error fetching conversations:', error);
         conversationList.innerHTML = '<p class="text-red-500">Failed to load conversation history.</p>';
@@ -187,13 +183,26 @@
         const elapsedTime = formatElapsedTime(new Date(conv.updated));
         const item = document.createElement('div');
         item.className = 'p-3 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors cursor-pointer';
+        item.dataset.conversationId = conv.conversationId; // for highlighting
+
         item.innerHTML = `
           <strong>${conv.name}</strong> (${conv.regulation})<br>
-          <span class="text-gray-600">Updated: ${elapsedTime} ago</span> | 
+          <span class="text-gray-600">Updated: ${elapsedTime} ago</span> |
           <span class="text-gray-600">${conv.sequenceCount} messages</span>
         `;
-        item.addEventListener('click', () => loadConversation(conv));
+        item.addEventListener('click', () => loadConversation(conv.conversationId));
         conversationList.appendChild(item);
+      });
+    }
+
+    function highlightActiveConversation() {
+      const items = conversationList.querySelectorAll('[data-conversation-id]');
+      items.forEach(item => {
+        if (item.dataset.conversationId === currentConversationId) {
+          item.classList.add('active-conversation');
+        } else {
+          item.classList.remove('active-conversation');
+        }
       });
     }
 
@@ -209,14 +218,9 @@
       return `${diffDays} days`;
     }
 
-    function loadConversation(conversation) {
-      console.log('Loading conversation:', conversation);
-      // If you want to restore the conversation, you can do so here
-      // e.g., fetch messages or set `currentConversationId = conversation.id`
-      // For now, we only log it to console
-    }
-
-    /* ------------------------------ Chat Logic ------------------------------ */
+    /* -------------------------------------------------------------------------- */
+    /*                            Chat / Message Logic                             */
+    /* -------------------------------------------------------------------------- */
     const chatMessages = document.getElementById('chat-messages');
     const chatForm = document.getElementById('chat-form');
     const userInput = document.getElementById('user-input');
@@ -226,6 +230,7 @@
     const closeButton = document.getElementById('close-regulation-modal');
 
     let currentConversationId = null;
+    const userId = getOrCreateUserId();
 
     marked.setOptions({
       breaks: true,
@@ -243,7 +248,7 @@
       if (isUser) {
         messageDiv.textContent = content;
       } else {
-        // Ensure numbered lists format properly
+        // Ensure numbered lists are displayed properly
         const processedContent = content.replace(/^\d+\./gm, '\n$&');
         const htmlContent = marked.parse(processedContent);
         const sanitizedHtml = DOMPurify.sanitize(htmlContent);
@@ -278,7 +283,7 @@
     }
 
     function newChat() {
-      // Remove all but the first message (the welcome message)
+      // remove all messages except the welcome
       while (chatMessages.children.length > 1) {
         chatMessages.removeChild(chatMessages.lastChild);
       }
@@ -301,9 +306,7 @@
       try {
         const response = await fetch('http://localhost:7071/api/summarize', {
           method: 'POST',
-          headers: {
-            "Content-Type": 'application/json'
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             userId,
             conversationId: currentConversationId,
@@ -318,7 +321,12 @@
 
         removeTypingIndicator(typingIndicator);
         currentConversationId = data.conversationId;
-        addMessage(data.result);
+
+        addMessage(data.result, false);
+
+        // Reload conversation list to keep updated
+        await fetchConversationHistory();
+        highlightActiveConversation();
       } catch (error) {
         removeTypingIndicator(typingIndicator);
         addMessage('Sorry, there was an error processing your request. Please try again.');
@@ -328,6 +336,55 @@
         sendButton.disabled = false;
         resetButton.disabled = false;
         userInput.focus();
+      }
+    }
+
+    /* -------------------------------------------------------------------------- */
+    /*                        Loading Existing Conversation                        */
+    /* -------------------------------------------------------------------------- */
+    async function loadConversation(conversationId) {
+      try {
+        // POST /api/conversations/load  { conversationId, userId }
+        const response = await fetch('http://localhost:7071/api/conversations/load', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ conversationId, userId })
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to load conversation');
+        }
+
+        const messages = await response.json();
+        // Sort by sequence ascending
+        messages.sort((a, b) => a.sequence - b.sequence);
+
+        // Clear the chat entirely (including welcome message)
+        chatMessages.innerHTML = '';
+
+        // Replay all conversation messages
+        for (const msg of messages) {
+          // The user typed 'promptRaw'
+          addMessage(msg.promptRaw, true);
+          // The response is from the system
+          addMessage(msg.response, false);
+        }
+
+        // Update currentConversationId
+        currentConversationId = conversationId;
+        highlightActiveConversation();
+
+        // Scroll to bottom & focus the input
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+        userInput.focus();
+      } catch (error) {
+        console.error('Error loading conversation:', error);
+
+        // Show an error message in the chat area
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'bg-red-100 text-red-700 p-4 rounded my-2';
+        errorDiv.textContent = 'Unable to load the conversation. Please try again.';
+        chatMessages.appendChild(errorDiv);
       }
     }
 
@@ -357,8 +414,8 @@
         if (!response.ok) {
           throw new Error('Failed to load regulations');
         }
-        const regulations = await response.json();
-        displayRegulationsList(regulations);
+        const regs = await response.json();
+        displayRegulationsList(regs);
       } catch (error) {
         console.error('Error loading regulations:', error);
       } finally {
@@ -400,9 +457,7 @@
       changeButton.style.display = 'block';
     }
 
-    document.getElementById('change-regulation').addEventListener('click', () => {
-      showRegulationModal();
-    });
+    document.getElementById('change-regulation').addEventListener('click', showRegulationModal);
 
     function showRegulationModal() {
       const modal = document.getElementById('regulation-modal');
@@ -428,21 +483,23 @@
 
     async function init() {
       try {
-        const hasRegulation = await checkSelectedRegulation();
+        const hasRegulation = checkSelectedRegulation();
         if (!hasRegulation) {
           disableChat();
         }
-        await resetConversation();
+        resetConversation();
       } finally {
         document.getElementById('initial-loading').remove();
       }
     }
 
+    // Handle form submission
     chatForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       const message = userInput.value.trim();
       if (!message) return;
 
+      // Add user message
       addMessage(message, true);
       userInput.value = '';
       await sendMessage(message);
@@ -451,8 +508,11 @@
     resetButton.addEventListener('click', resetConversation);
     closeButton.addEventListener('click', hideRegulationModal);
 
-    // Initialize the chat after page load
-    init();
+    // On DOM load, fetch conversation list & init chat
+    document.addEventListener('DOMContentLoaded', () => {
+      fetchConversationHistory();
+      init();
+    });
   </script>
 </body>
 </html>
