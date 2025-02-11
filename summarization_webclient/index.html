@@ -1,396 +1,524 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chat Interface</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        .typing-indicator {
-            display: flex;
-            gap: 4px;
-            padding: 12px;
-        }
-
-        .typing-dot {
-            width: 8px;
-            height: 8px;
-            background-color: #9CA3AF;
-            border-radius: 50%;
-            animation: typing-bounce 1.4s infinite ease-in-out;
-        }
-
-        .typing-dot:nth-child(1) { animation-delay: 0s; }
-        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
-        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
-
-        @keyframes typing-bounce {
-            0%, 80%, 100% { transform: translateY(0); }
-            40% { transform: translateY(-8px); }
-        }
-
-        @media (min-height: 800px) {
-            .chat-container {
-                height: 80vh;
-            }
-        }
-
-        .message-content ol {
-            list-style-type: decimal;
-            padding-left: 2.5rem;
-            margin: 1rem 0;
-        }
-
-        .message-content li {
-            margin-bottom: 0.5rem;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Chat Interface</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .typing-indicator {
+      display: flex;
+      gap: 4px;
+      padding: 12px;
+    }
+    .typing-dot {
+      width: 8px;
+      height: 8px;
+      background-color: #9CA3AF;
+      border-radius: 50%;
+      animation: typing-bounce 1.4s infinite ease-in-out;
+    }
+    .typing-dot:nth-child(1) {
+      animation-delay: 0s;
+    }
+    .typing-dot:nth-child(2) {
+      animation-delay: 0.2s;
+    }
+    .typing-dot:nth-child(3) {
+      animation-delay: 0.4s;
+    }
+    @keyframes typing-bounce {
+      0%, 80%, 100% { transform: translateY(0); }
+      40% { transform: translateY(-8px); }
+    }
+    @media (min-height: 800px) {
+      .chat-container { height: 80vh; }
+    }
+    .message-content ol {
+      list-style-type: decimal;
+      padding-left: 2.5rem;
+      margin: 1rem 0;
+    }
+    .message-content li {
+      margin-bottom: 0.5rem;
+    }
+    /* Highlight style for active conversation */
+    .active-conversation {
+      background-color: #bfdbfe !important; /* Tailwind's bg-blue-200 */
+    }
+  </style>
 </head>
+
 <body class="bg-gray-100 min-h-screen">
-    <div class="container mx-auto px-4 py-8 max-w-4xl">
-        <div class="bg-white rounded-lg shadow-lg p-6 chat-container flex flex-col">
-            <div class="flex justify-between items-center mb-4 pb-4 border-b">
-                <div class="flex items-center gap-4">
-                    <h1 class="text-xl font-semibold">Chat Interface</h1>
-                    <div class="flex items-center gap-2">
-                        <div id="selected-regulation" class="text-sm text-gray-600"></div>
-                        <button 
-                            id="change-regulation"
-                            class="text-sm text-blue-500 hover:text-blue-700"
-                            style="display: none;"
-                        >
-                            Change
-                        </button>
-                    </div>
-                </div>
-                <button 
-                    id="reset-button"
-                    class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition-colors"
-                >
-                    Reset Chat
-                </button>
-            </div>
-
-            <div id="regulation-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
-                <div class="bg-white p-6 rounded-lg max-w-md w-full">
-                    <div class="flex justify-between items-center mb-4">
-                        <h2 class="text-lg font-semibold">Select Regulation</h2>
-                        <button 
-                            id="close-regulation-modal"
-                            class="text-gray-500 hover:text-gray-700 hidden"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
-                    </div>
-                    <div id="regulation-loading" class="py-8 flex justify-center items-center hidden">
-                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-                    </div>
-                    <div id="regulation-list" class="space-y-2 mb-4"></div>
-                </div>
-            </div>
-
-            <div id="initial-loading" class="fixed inset-0 bg-white flex items-center justify-center">
-                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-            </div>
-
-            <div id="chat-messages" class="flex-1 space-y-4 overflow-y-auto mb-4" style="min-height: 500px;">
-                <div class="bg-blue-100 p-4 rounded">
-                    <p>Welcome! How can I help you today?</p>
-                </div>
-            </div>
-
-            <form id="chat-form" class="flex gap-2 pt-4 border-t">
-                <input 
-                    type="text" 
-                    id="user-input" 
-                    class="flex-1 p-3 border rounded focus:outline-none focus:border-blue-500"
-                    placeholder="Type your message..."
-                    required
-                    disabled
-                >
-                <button 
-                    type="submit"
-                    id="send-button"
-                    class="bg-blue-500 text-white px-6 py-3 rounded hover:bg-blue-600 transition-colors"
-                    disabled
-                >
-                    Send
-                </button>
-            </form>
+  <div class="container mx-auto px-4 py-8 max-w-6xl">
+    <div class="flex gap-6">
+      <!-- Sidebar for Conversation History -->
+      <aside class="w-1/3 bg-white rounded-lg shadow-lg p-4 h-[80vh] overflow-y-auto">
+        <h2 class="text-lg font-semibold mb-4">Conversation History</h2>
+        <div id="conversation-list" class="space-y-2 text-sm text-gray-700">
+          <p class="text-gray-500">Loading conversations...</p>
         </div>
+      </aside>
+
+      <!-- Main Chat Area (Original Chat Container) -->
+      <div class="bg-white rounded-lg shadow-lg p-6 chat-container flex flex-col flex-1">
+        <div class="flex justify-between items-center mb-4 pb-4 border-b">
+          <div class="flex items-center gap-4">
+            <h1 class="text-xl font-semibold">Chat Interface</h1>
+            <div class="flex items-center gap-2">
+              <div id="selected-regulation" class="text-sm text-gray-600"></div>
+              <button id="change-regulation" class="text-sm text-blue-500 hover:text-blue-700" style="display: none;">
+                Change
+              </button>
+            </div>
+          </div>
+          <button id="reset-button" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition-colors">
+            Reset Chat
+          </button>
+        </div>
+
+        <div id="regulation-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
+          <div class="bg-white p-6 rounded-lg max-w-md w-full">
+            <div class="flex justify-between items-center mb-4">
+              <h2 class="text-lg font-semibold">Select Regulation</h2>
+              <button id="close-regulation-modal" class="text-gray-500 hover:text-gray-700 hidden">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
+                     stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div id="regulation-loading" class="py-8 flex justify-center items-center hidden">
+              <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+            </div>
+            <div id="regulation-list" class="space-y-2 mb-4"></div>
+          </div>
+        </div>
+
+        <div id="initial-loading" class="fixed inset-0 bg-white flex items-center justify-center">
+          <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+        </div>
+
+        <div id="chat-messages" class="flex-1 space-y-4 overflow-y-auto mb-4" style="min-height: 500px;">
+          <!-- This is your initial "welcome" message -->
+          <div class="bg-blue-100 p-4 rounded">
+            <p>Welcome! How can I help you today?</p>
+          </div>
+        </div>
+
+        <form id="chat-form" class="flex gap-2 pt-4 border-t">
+          <input
+            type="text"
+            id="user-input"
+            class="flex-1 p-3 border rounded focus:outline-none focus:border-blue-500"
+            placeholder="Type your message..."
+            required
+            disabled
+          />
+          <button
+            type="submit"
+            id="send-button"
+            class="bg-blue-500 text-white px-6 py-3 rounded hover:bg-blue-600 transition-colors"
+            disabled
+          >
+            Send
+          </button>
+        </form>
+      </div>
     </div>
+  </div>
 
-    <template id="typing-template">
-        <div class="bg-gray-50 p-4 rounded">
-            <div class="typing-indicator">
-                <div class="typing-dot"></div>
-                <div class="typing-dot"></div>
-                <div class="typing-dot"></div>
-            </div>
-        </div>
-    </template>
+  <!-- Template for typing indicator -->
+  <template id="typing-template">
+    <div class="bg-gray-50 p-4 rounded">
+      <div class="typing-indicator">
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+      </div>
+    </div>
+  </template>
 
-    <script>
-        const chatMessages = document.getElementById('chat-messages');
-        const chatForm = document.getElementById('chat-form');
-        const userInput = document.getElementById('user-input');
-        const sendButton = document.getElementById('send-button');
-        const resetButton = document.getElementById('reset-button');
-        const typingTemplate = document.getElementById('typing-template');
-        const closeButton = document.getElementById('close-regulation-modal');
+  <script>
+    /* -------------------------------------------------------------------------- */
+    /*                            Conversation List Logic                          */
+    /* -------------------------------------------------------------------------- */
+    const conversationList = document.getElementById('conversation-list');
 
-        marked.setOptions({
-            breaks: true,
-            gfm: true,
-            pedantic: false,
-            headerIds: false
+    async function fetchConversationHistory() {
+      try {
+        const response = await fetch('http://localhost:7071/api/conversations/list', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId })
+        });
+        if (!response.ok) throw new Error('Failed to load conversations');
+
+        let conversations = await response.json();
+
+        // Sort by updated, then created (both descending)
+        conversations.sort((a, b) =>
+          new Date(b.updated) - new Date(a.updated) || new Date(b.created) - new Date(a.created)
+        );
+
+        displayConversations(conversations);
+        highlightActiveConversation(); // highlight conversation if it matches the current ID
+      } catch (error) {
+        console.error('Error fetching conversations:', error);
+        conversationList.innerHTML = '<p class="text-red-500">Failed to load conversation history.</p>';
+      }
+    }
+
+    function displayConversations(conversations) {
+      if (conversations.length === 0) {
+        conversationList.innerHTML = '<p class="text-gray-500">No previous conversations found.</p>';
+        return;
+      }
+
+      conversationList.innerHTML = '';
+      conversations.forEach(conv => {
+        const elapsedTime = formatElapsedTime(new Date(conv.updated));
+        const item = document.createElement('div');
+        item.className = 'p-3 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors cursor-pointer';
+        item.dataset.conversationId = conv.id; // for highlighting
+
+        item.innerHTML = `
+          <strong>${conv.name}</strong> (${conv.regulation})<br>
+          <span class="text-gray-600">Updated: ${elapsedTime} ago</span> |
+          <span class="text-gray-600">${conv.sequenceCount} messages</span>
+        `;
+        item.addEventListener('click', () => loadConversation(conv.id));
+        conversationList.appendChild(item);
+      });
+    }
+
+    function highlightActiveConversation() {
+      const items = conversationList.querySelectorAll('[data-conversation-id]');
+      items.forEach(item => {
+        if (item.dataset.conversationId === currentConversationId) {
+          item.classList.add('active-conversation');
+        } else {
+          item.classList.remove('active-conversation');
+        }
+      });
+    }
+
+    function formatElapsedTime(updatedDate) {
+      const now = new Date();
+      const diffMs = now - updatedDate;
+      const diffMin = Math.floor(diffMs / (1000 * 60));
+      const diffHours = Math.floor(diffMin / 60);
+      const diffDays = Math.floor(diffHours / 24);
+
+      if (diffMin < 60) return `${diffMin} min`;
+      if (diffHours < 24) return `${diffHours} hours`;
+      return `${diffDays} days`;
+    }
+
+    /* -------------------------------------------------------------------------- */
+    /*                            Chat / Message Logic                             */
+    /* -------------------------------------------------------------------------- */
+    const chatMessages = document.getElementById('chat-messages');
+    const chatForm = document.getElementById('chat-form');
+    const userInput = document.getElementById('user-input');
+    const sendButton = document.getElementById('send-button');
+    const resetButton = document.getElementById('reset-button');
+    const typingTemplate = document.getElementById('typing-template');
+    const closeButton = document.getElementById('close-regulation-modal');
+
+    let currentConversationId = null;
+    const userId = getOrCreateUserId();
+
+    marked.setOptions({
+      breaks: true,
+      gfm: true,
+      pedantic: false,
+      headerIds: false
+    });
+
+    function addMessage(content, isUser = false) {
+      const messageDiv = document.createElement('div');
+      messageDiv.className = isUser
+        ? 'bg-blue-50 p-4 rounded'
+        : 'bg-gray-50 p-4 rounded message-content';
+
+      if (isUser) {
+        messageDiv.textContent = content;
+      } else {
+        // Ensure numbered lists are displayed properly
+        const processedContent = content.replace(/^\d+\./gm, '\n$&');
+        const htmlContent = marked.parse(processedContent);
+        const sanitizedHtml = DOMPurify.sanitize(htmlContent);
+        messageDiv.innerHTML = sanitizedHtml;
+      }
+
+      chatMessages.appendChild(messageDiv);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    function showTypingIndicator() {
+      const typingIndicator = typingTemplate.content.cloneNode(true);
+      chatMessages.appendChild(typingIndicator);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+      return chatMessages.lastElementChild;
+    }
+
+    function removeTypingIndicator(indicator) {
+      if (indicator && indicator.parentNode) {
+        indicator.remove();
+      }
+    }
+
+    function getOrCreateUserId() {
+      const existingUserId = localStorage.getItem("userId");
+      if (existingUserId) {
+        return existingUserId;
+      }
+      const generatedUserId = crypto.randomUUID();
+      localStorage.setItem("userId", generatedUserId);
+      return generatedUserId;
+    }
+
+    function newChat() {
+      // remove all messages except the welcome
+      while (chatMessages.children.length > 1) {
+        chatMessages.removeChild(chatMessages.lastChild);
+      }
+      currentConversationId = null;
+      userInput.value = '';
+      userInput.focus();
+    }
+
+    function resetConversation() {
+      newChat();
+    }
+
+    async function sendMessage(message) {
+      userInput.disabled = true;
+      sendButton.disabled = true;
+      resetButton.disabled = true;
+
+      const typingIndicator = showTypingIndicator();
+      const selectedRegulation = getSelectedRegulation();
+      try {
+        const response = await fetch('http://localhost:7071/api/summarize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId,
+            conversationId: currentConversationId,
+            query: message,
+            regulation: selectedRegulation.partitionKey
+          })
+        });
+        if (!response.ok) {
+          throw new Error('API request failed');
+        }
+        const data = await response.json();
+
+        removeTypingIndicator(typingIndicator);
+        currentConversationId = data.conversationId;
+
+        addMessage(data.result, false);
+
+        // Reload conversation list to keep updated
+        await fetchConversationHistory();
+        highlightActiveConversation();
+      } catch (error) {
+        removeTypingIndicator(typingIndicator);
+        addMessage('Sorry, there was an error processing your request. Please try again.');
+        console.error('Error:', error);
+      } finally {
+        userInput.disabled = false;
+        sendButton.disabled = false;
+        resetButton.disabled = false;
+        userInput.focus();
+      }
+    }
+
+    /* -------------------------------------------------------------------------- */
+    /*                        Loading Existing Conversation                        */
+    /* -------------------------------------------------------------------------- */
+    async function loadConversation(conversationId) {
+      try {
+        // POST /api/conversations/load  { conversationId, userId }
+        const response = await fetch('http://localhost:7071/api/conversations/load', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ conversationId, userId })
         });
 
-        function addMessage(content, isUser = false) {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = isUser ? 
-                'bg-blue-50 p-4 rounded' : 
-                'bg-gray-50 p-4 rounded message-content';
-
-            if (isUser) {
-                messageDiv.textContent = content;
-            } else {
-                const processedContent = content.replace(/^\d+\./gm, '\n$&');
-                const htmlContent = marked.parse(processedContent);
-                const sanitizedHtml = DOMPurify.sanitize(htmlContent);
-                messageDiv.innerHTML = sanitizedHtml;
-            }
-
-            chatMessages.appendChild(messageDiv);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
+        if (!response.ok) {
+          throw new Error('Failed to load conversation');
         }
 
-        function showTypingIndicator() {
-            const typingIndicator = typingTemplate.content.cloneNode(true);
-            chatMessages.appendChild(typingIndicator);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-            return chatMessages.lastElementChild;
+        const messages = await response.json();
+
+        // Clear the chat entirely (including welcome message)
+        chatMessages.innerHTML = '';
+
+        // Check if the conversation contains a log
+        if (messages.log && messages.log.length > 0) {
+          // Sort messages by sequence order
+          messages.log.sort((a, b) => a.sequence - b.sequence);
+
+          // Display all messages in order
+          for (const msg of messages.log) {
+            // Display user prompt
+            addMessage(msg.promptRaw, true);
+            // Display system response
+            addMessage(msg.response, false);
+          }
+        } else {
+          addMessage('No messages found in this conversation.', false);
         }
 
-        function removeTypingIndicator(indicator) {
-            if (indicator && indicator.parentNode) {
-                indicator.remove();
-            }
+        // Update currentConversationId
+        currentConversationId = conversationId;
+        highlightActiveConversation();
+
+        // Scroll to bottom & focus the input
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+        userInput.focus();
+      } catch (error) {
+        console.error('Error loading conversation:', error);
+
+        // Show an error message in the chat area
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'bg-red-100 text-red-700 p-4 rounded my-2';
+        errorDiv.textContent = 'Unable to load the conversation. Please try again.';
+        chatMessages.appendChild(errorDiv);
+      }
+    }
+
+    function checkSelectedRegulation() {
+      const selectedRegulation = getSelectedRegulation();
+      closeButton.classList.toggle('hidden', selectedRegulation ? false : true);
+
+      if (!selectedRegulation) {
+        showRegulationModal();
+        return false;
+      }
+
+      displaySelectedRegulation(selectedRegulation);
+      enableChat();
+      return true;
+    }
+
+    async function loadRegulations() {
+      const loadingIndicator = document.getElementById('regulation-loading');
+      const regulationList = document.getElementById('regulation-list');
+
+      loadingIndicator.classList.remove('hidden');
+      regulationList.classList.add('hidden');
+
+      try {
+        const response = await fetch('http://localhost:7071/api/regulations');
+        if (!response.ok) {
+          throw new Error('Failed to load regulations');
         }
+        const regs = await response.json();
+        displayRegulationsList(regs);
+      } catch (error) {
+        console.error('Error loading regulations:', error);
+      } finally {
+        loadingIndicator.classList.add('hidden');
+        regulationList.classList.remove('hidden');
+      }
+    }
 
-        function clearChat() {
-            while (chatMessages.children.length > 1) {
-                chatMessages.removeChild(chatMessages.lastChild);
-            }
-            userInput.value = '';
-            userInput.focus();
+    function displayRegulationsList(regulations) {
+      const container = document.getElementById('regulation-list');
+      container.innerHTML = '';
+
+      regulations.forEach(reg => {
+        const button = document.createElement('button');
+        button.className = 'w-full p-2 text-left hover:bg-gray-100 rounded';
+        button.textContent = reg.title;
+        button.onclick = () => setSelectedRegulation(reg);
+        container.appendChild(button);
+      });
+    }
+
+    function setSelectedRegulation(regulation) {
+      localStorage.setItem('selectedRegulation', JSON.stringify(regulation));
+      displaySelectedRegulation(regulation);
+      hideRegulationModal();
+      enableChat();
+      newChat();
+    }
+
+    function getSelectedRegulation() {
+      const regulationString = localStorage.getItem('selectedRegulation');
+      return regulationString && JSON.parse(regulationString);
+    }
+
+    function displaySelectedRegulation(regulation) {
+      const display = document.getElementById('selected-regulation');
+      const changeButton = document.getElementById('change-regulation');
+      display.textContent = `Selected: ${regulation.title}`;
+      changeButton.style.display = 'block';
+    }
+
+    document.getElementById('change-regulation').addEventListener('click', showRegulationModal);
+
+    function showRegulationModal() {
+      const modal = document.getElementById('regulation-modal');
+      modal.classList.remove('hidden');
+      loadRegulations();
+    }
+
+    function hideRegulationModal() {
+      const modal = document.getElementById('regulation-modal');
+      modal.classList.add('hidden');
+    }
+
+    function enableChat() {
+      userInput.disabled = false;
+      sendButton.disabled = false;
+      userInput.focus();
+    }
+
+    function disableChat() {
+      userInput.disabled = true;
+      sendButton.disabled = true;
+    }
+
+    async function init() {
+      try {
+        const hasRegulation = checkSelectedRegulation();
+        if (!hasRegulation) {
+          disableChat();
         }
+        resetConversation();
+      } finally {
+        document.getElementById('initial-loading').remove();
+      }
+    }
 
-        async function resetConversation() {
-            try {
-                resetButton.disabled = true;
-                userInput.disabled = true;
-                sendButton.disabled = true;
+    // Handle form submission
+    chatForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const message = userInput.value.trim();
+      if (!message) return;
 
-                const response = await fetch('http://localhost:7071/api/clear', {
-                    method: 'POST'
-                });
+      // Add user message
+      addMessage(message, true);
+      userInput.value = '';
+      await sendMessage(message);
+    });
 
-                if (!response.ok) {
-                    throw new Error('Failed to reset conversation');
-                }
+    resetButton.addEventListener('click', resetConversation);
+    closeButton.addEventListener('click', hideRegulationModal);
 
-                clearChat();
-            } catch (error) {
-                addMessage('Sorry, there was an error resetting the conversation. Please try again.');
-                console.error('Error:', error);
-            } finally {
-                resetButton.disabled = false;
-                userInput.disabled = false;
-                sendButton.disabled = false;
-            }
-        }
-
-        async function sendMessage(message) {
-            userInput.disabled = true;
-            sendButton.disabled = true;
-            resetButton.disabled = true;
-            
-            const typingIndicator = showTypingIndicator();
-
-            try {
-                const response = await fetch(`http://localhost:7071/api/summarize?query=${encodeURIComponent(message)}`);
-                if (!response.ok) {
-                    throw new Error('API request failed');
-                }
-                const data = await response.json();
-                
-                removeTypingIndicator(typingIndicator);
-                addMessage(data.result);
-            } catch (error) {
-                removeTypingIndicator(typingIndicator);
-                addMessage('Sorry, there was an error processing your request. Please try again.');
-                console.error('Error:', error);
-            } finally {
-                userInput.disabled = false;
-                sendButton.disabled = false;
-                resetButton.disabled = false;
-                userInput.focus();
-            }
-        }
-
-        async function checkSelectedRegulation() {
-            try {
-                const response = await fetch('http://localhost:7071/api/regulations/selected');
-                const hasRegulation = response.status !== 404;
-                closeButton.classList.toggle('hidden', !hasRegulation);
-                
-                if (response.status === 404) {
-                    showRegulationModal();
-                    return false;
-                }
-                if (!response.ok) {
-                    throw new Error('Failed to get selected regulation');
-                }
-                const regulation = await response.json();
-                displaySelectedRegulation(regulation);
-                enableChat();
-                return true;
-            } catch (error) {
-                console.error('Error checking regulation:', error);
-                return false;
-            }
-        }
-
-        async function loadRegulations() {
-            const loadingIndicator = document.getElementById('regulation-loading');
-            const regulationList = document.getElementById('regulation-list');
-            
-            loadingIndicator.classList.remove('hidden');
-            regulationList.classList.add('hidden');
-            
-            try {
-                const response = await fetch('http://localhost:7071/api/regulations');
-                if (!response.ok) {
-                    throw new Error('Failed to load regulations');
-                }
-                const regulations = await response.json();
-                displayRegulationsList(regulations);
-            } catch (error) {
-                console.error('Error loading regulations:', error);
-            } finally {
-                loadingIndicator.classList.add('hidden');
-                regulationList.classList.remove('hidden');
-            }
-        }
-
-        function displayRegulationsList(regulations) {
-            const container = document.getElementById('regulation-list');
-            container.innerHTML = '';
-            
-            regulations.forEach(reg => {
-                const button = document.createElement('button');
-                button.className = 'w-full p-2 text-left hover:bg-gray-100 rounded';
-                button.textContent = reg.title;
-                button.onclick = () => selectRegulation(reg);
-                container.appendChild(button);
-            });
-        }
-
-        async function selectRegulation(regulation) {
-            try {
-                const button = event.target;
-                const originalText = button.textContent;
-                button.disabled = true;
-                button.innerHTML = '<div class="animate-spin inline-block w-4 h-4 border-2 border-b-transparent border-blue-500 rounded-full"></div>';
-                
-                const response = await fetch('http://localhost:7071/api/regulations', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(regulation)
-                });
-
-                if (!response.ok) {
-                    throw new Error('Failed to set regulation');
-                }
-
-                displaySelectedRegulation(regulation);
-                hideRegulationModal();
-                enableChat();
-                clearChat();
-            } catch (error) {
-                console.error('Error setting regulation:', error);
-            } finally {
-                button.disabled = false;
-                button.textContent = originalText;
-            }
-        }
-
-        function displaySelectedRegulation(regulation) {
-            const display = document.getElementById('selected-regulation');
-            const changeButton = document.getElementById('change-regulation');
-            display.textContent = `Selected: ${regulation.title}`;
-            changeButton.style.display = 'block';
-        }
-
-        document.getElementById('change-regulation').addEventListener('click', () => {
-            showRegulationModal();
-        });
-
-        function showRegulationModal() {
-            const modal = document.getElementById('regulation-modal');
-            modal.classList.remove('hidden');
-            loadRegulations();
-        }
-
-        function hideRegulationModal() {
-            const modal = document.getElementById('regulation-modal');
-            modal.classList.add('hidden');
-        }
-
-        function enableChat() {
-            userInput.disabled = false;
-            sendButton.disabled = false;
-            userInput.focus();
-        }
-
-        function disableChat() {
-            userInput.disabled = true;
-            sendButton.disabled = true;
-        }
-
-        async function init() {
-            try {
-                const hasRegulation = await checkSelectedRegulation();
-                if (!hasRegulation) {
-                    disableChat();
-                }
-                await resetConversation();
-            } finally {
-                document.getElementById('initial-loading').remove();
-            }
-        }
-
-        chatForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const message = userInput.value.trim();
-            if (!message) return;
-
-            addMessage(message, true);
-            userInput.value = '';
-            await sendMessage(message);
-        });
-
-        resetButton.addEventListener('click', resetConversation);
-        closeButton.addEventListener('click', hideRegulationModal);
-        
-        init();
-    </script>
+    // On DOM load, fetch conversation list & init chat
+    document.addEventListener('DOMContentLoaded', () => {
+      fetchConversationHistory();
+      init();
+    });
+  </script>
 </body>
 </html>
