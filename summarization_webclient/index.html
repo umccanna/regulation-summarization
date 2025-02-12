@@ -344,7 +344,9 @@
     /* -------------------------------------------------------------------------- */
     async function loadConversation(conversationId) {
       try {
-        // POST /api/conversations/load  { conversationId, userId }
+        console.log(`Fetching conversation for conversationId: ${conversationId}`);
+
+        // Fetch conversation details
         const response = await fetch('http://localhost:7071/api/conversations/load', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -356,61 +358,92 @@
         }
 
         const messages = await response.json();
+        console.log('Retrieved conversation:', messages);
 
-        if (messages.regulation) {
-          updateSelectedRegulation(messages.regulation);
+        // Fetch regulations only once
+        console.log('Fetching regulations...');
+        const regulationsResponse = await fetch('http://localhost:7071/api/regulations', {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!regulationsResponse.ok) {
+          throw new Error('Failed to load regulations from the server.');
         }
 
-        // Clear the chat entirely (including welcome message)
+        const regulations = await regulationsResponse.json();
+        console.log('Retrieved regulations:', regulations);
+
+        // Validate the conversation’s regulation
+        const selectedRegulation = regulations.find(reg => reg.partitionKey === messages.regulation);
+
+        if (!selectedRegulation) {
+          console.error(`Invalid regulation '${messages.regulation}' for conversation '${conversationId}'. Regulation not found.`);
+
+          // Display error message in the chat area
+          chatMessages.innerHTML = `
+            <div class="bg-red-100 text-red-700 p-4 rounded my-2">
+              Unable to load the conversation because the selected regulation is no longer available.
+            </div>
+          `;
+          return; // Stop further execution
+        }
+
+        console.log(`Valid regulation found: ${selectedRegulation.title} (${selectedRegulation.partitionKey})`);
+        
+        // Update the UI with the correct regulation
+        updateSelectedRegulation(selectedRegulation);
+
+        // Clear the chat area
         chatMessages.innerHTML = '';
 
         // Check if the conversation contains a log
         if (messages.log && messages.log.length > 0) {
-          // Sort messages by sequence order
           messages.log.sort((a, b) => a.sequence - b.sequence);
-
-          // Display all messages in order
-          for (const msg of messages.log) {
-            // Display user prompt
+          messages.log.forEach(msg => {
             addMessage(msg.promptRaw, true);
-            // Display system response
             addMessage(msg.response, false);
-          }
+          });
         } else {
           addMessage('No messages found in this conversation.', false);
         }
 
-        // Update currentConversationId
+        // Update current conversation ID
         currentConversationId = conversationId;
         highlightActiveConversation();
 
-        // Scroll to bottom & focus the input
+        // Scroll chat to bottom
         chatMessages.scrollTop = chatMessages.scrollHeight;
         userInput.focus();
       } catch (error) {
         console.error('Error loading conversation:', error);
 
-        // Show an error message in the chat area
-        const errorDiv = document.createElement('div');
-        errorDiv.className = 'bg-red-100 text-red-700 p-4 rounded my-2';
-        errorDiv.textContent = 'Unable to load the conversation. Please try again.';
-        chatMessages.appendChild(errorDiv);
+        chatMessages.innerHTML = `
+          <div class="bg-red-100 text-red-700 p-4 rounded my-2">
+            Unable to load the conversation. Please try again later.
+          </div>
+        `;
       }
     }
 
-    function updateSelectedRegulation(regulationPartitionKey) {
-      let regulations = JSON.parse(localStorage.getItem('regulations')) || [];
-      let selectedReg = regulations.find(reg => reg.partitionKey === regulationPartitionKey);
+    function updateSelectedRegulation(selectedRegulation) {
+      if (selectedRegulation) {
+        console.log(`Updating UI with regulation: ${selectedRegulation.title} (${selectedRegulation.partitionKey})`);
 
-      if (selectedReg) {
-        localStorage.setItem('selectedRegulation', JSON.stringify(selectedReg));
-
+        // Update the UI to reflect the new regulation
         const regulationDisplay = document.getElementById('selected-regulation');
-        regulationDisplay.textContent = `Selected: ${selectedReg.title}`;
+        regulationDisplay.textContent = `Selected: ${selectedRegulation.title}`;
 
+        // Ensure the "Change" button appears
         document.getElementById('change-regulation').style.display = 'inline';
       } else {
-        console.warn('Regulation not found for partitionKey:', regulationPartitionKey);
+        console.error('Attempted to update regulation, but selectedRegulation is null or undefined.');
+
+        chatMessages.innerHTML = `
+          <div class="bg-red-100 text-red-700 p-4 rounded my-2">
+            Unable to update the regulation display. Please refresh the page.
+          </div>
+        `;
       }
     }
 
