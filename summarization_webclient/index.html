@@ -357,6 +357,10 @@
 
         const messages = await response.json();
 
+        if (messages.regulation) {
+          updateSelectedRegulation(messages.regulation);
+        }
+
         // Clear the chat entirely (including welcome message)
         chatMessages.innerHTML = '';
 
@@ -391,6 +395,22 @@
         errorDiv.className = 'bg-red-100 text-red-700 p-4 rounded my-2';
         errorDiv.textContent = 'Unable to load the conversation. Please try again.';
         chatMessages.appendChild(errorDiv);
+      }
+    }
+
+    function updateSelectedRegulation(regulationPartitionKey) {
+      let regulations = JSON.parse(localStorage.getItem('regulations')) || [];
+      let selectedReg = regulations.find(reg => reg.partitionKey === regulationPartitionKey);
+
+      if (selectedReg) {
+        localStorage.setItem('selectedRegulation', JSON.stringify(selectedReg));
+
+        const regulationDisplay = document.getElementById('selected-regulation');
+        regulationDisplay.textContent = `Selected: ${selectedReg.title}`;
+
+        document.getElementById('change-regulation').style.display = 'inline';
+      } else {
+        console.warn('Regulation not found for partitionKey:', regulationPartitionKey);
       }
     }
 
