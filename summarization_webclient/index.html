@@ -357,6 +357,11 @@
 
         const messages = await response.json();
 
+        // Ensure the regulation is updated when loading a conversation
+        if (messages.regulation) {
+          updateSelectedRegulation(messages.regulation);
+        }
+
         // Clear the chat entirely (including welcome message)
         chatMessages.innerHTML = '';
 
@@ -394,6 +399,26 @@
       }
     }
 
+
+    function updateSelectedRegulation(regulationPartitionKey) {
+      // Retrieve stored regulations
+      let regulations = JSON.parse(localStorage.getItem('regulations')) || [];
+      let selectedReg = regulations.find(reg => reg.partitionKey === regulationPartitionKey);
+
+      if (selectedReg) {
+        // Store the newly selected regulation
+        localStorage.setItem('selectedRegulation', JSON.stringify(selectedReg));
+
+        // Update the UI text dynamically
+        const regulationDisplay = document.getElementById('selected-regulation');
+        regulationDisplay.textContent = `Selected: ${selectedReg.title}`;
+        document.getElementById('change-regulation').style.display = 'inline';
+      } else {
+        console.warn('Regulation not found for partitionKey:', regulationPartitionKey);
+      }
+    }
+
+
     function checkSelectedRegulation() {
       const selectedRegulation = getSelectedRegulation();
       closeButton.classList.toggle('hidden', selectedRegulation ? false : true);
@@ -421,6 +446,7 @@
           throw new Error('Failed to load regulations');
         }
         const regs = await response.json();
+        localStorage.setItem('regulations', JSON.stringify(regs));
         displayRegulationsList(regs);
       } catch (error) {
         console.error('Error loading regulations:', error);
