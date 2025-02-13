@@ -17,7 +17,7 @@ jobs:
     - name: Stage Files
       run: |
         mkdir ./output
-        mv ./summarization_webclient/index.html ./output/index.html
+        cp ./summarization_webclient/index.html ./output/
         
     - name: Upload to Blob Storage
       uses: azure/CLI@v1
