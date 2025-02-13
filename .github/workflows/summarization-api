@@ -5,6 +5,7 @@ on:
     branches: ["main"]
     paths:
       - 'summarization_api/**'
+  workflow_dispatch
 
 env:
   AZURE_FUNCTIONAPP_NAME: 'millfunc-sumai'   # set this to your function app name on Azure
