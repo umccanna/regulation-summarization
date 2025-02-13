@@ -391,8 +391,7 @@
 
         console.log(`Valid regulation found: ${selectedRegulation.title} (${selectedRegulation.partitionKey})`);
         
-        // Update the UI with the correct regulation
-        updateSelectedRegulation(selectedRegulation);
+        setSelectedRegulation(selectedRegulation);
 
         // Clear the chat area
         chatMessages.innerHTML = '';
@@ -411,7 +410,6 @@
         // Update current conversation ID
         currentConversationId = conversationId;
         highlightActiveConversation();
-
         // Scroll chat to bottom
         chatMessages.scrollTop = chatMessages.scrollHeight;
         userInput.focus();
@@ -491,18 +489,36 @@
         const button = document.createElement('button');
         button.className = 'w-full p-2 text-left hover:bg-gray-100 rounded';
         button.textContent = reg.title;
-        button.onclick = () => setSelectedRegulation(reg);
+        button.onclick = () => handleOnModalSelectedRegulation(reg);
         container.appendChild(button);
       });
     }
 
     function setSelectedRegulation(regulation) {
-      localStorage.setItem('selectedRegulation', JSON.stringify(regulation));
-      displaySelectedRegulation(regulation);
+      if (!regulation) {
+        console.error('setSelectedRegulation called with null/undefined regulation.');
+        return;
+      }
+
+      console.log(`Setting selected regulation: ${regulation.title} (${regulation.partitionKey})`);
+
+      // Update the displayed text in the UI
+      const regulationDisplay = document.getElementById('selected-regulation');
+      regulationDisplay.textContent = `Selected: ${regulation.title}`;
+
+      // Show the "Change" button
+      document.getElementById('change-regulation').style.display = 'inline';
+    }
+
+    function handleOnModalSelectedRegulation(regulation) {
+      setSelectedRegulation(regulation);
+
+      // Handle additional UI behaviors
       hideRegulationModal();
       enableChat();
       newChat();
     }
+
 
     function getSelectedRegulation() {
       const regulationString = localStorage.getItem('selectedRegulation');
