@@ -303,6 +303,9 @@
 
       const typingIndicator = showTypingIndicator();
       const selectedRegulation = getSelectedRegulation();
+
+      console.log("Sending message with selected regulation:", selectedRegulation);
+
       try {
         const response = await fetch('http://localhost:7071/api/summarize', {
           method: 'POST',
