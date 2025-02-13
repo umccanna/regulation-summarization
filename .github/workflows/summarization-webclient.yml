@@ -29,6 +29,12 @@ jobs:
         npm install
         npm run build
         
+    - name: Delete Blob Storage Files
+      uses: azure/CLI@v1
+      with:
+        inlineScript: |
+            az storage blob delete-batch --account-key ${{ secrets.STATIC_WEBSITE_ACCESS_KEY }} --account-name ${{ env.STORAGE_ACCOUNT_NAME }} -s $web
+        
     - name: Upload to Blob Storage
       uses: azure/CLI@v1
       with:
