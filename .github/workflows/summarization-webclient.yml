@@ -4,6 +4,8 @@ on:
   workflow_dispatch:
   push:
     branches: [ main ]
+    paths:
+      - 'summarization_webclient/**'
       
 env:
   STORAGE_ACCOUNT_NAME: 'millsumaiweb'
