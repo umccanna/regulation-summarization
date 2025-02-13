@@ -1,0 +1,25 @@
+name: Deploy Summarization Web Client
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+      
+env:
+  STORAGE_ACCOUNT_NAME: 'millsumaiweb'
+
+jobs:
+  deploy: 
+    runs-on: ubuntu-latest
+    steps:
+    - name: Stage Files
+      run: |
+        mkdir /output
+        mv /summarization_webclient/index.html /output/index.html
+        
+    - name: Upload to Blob Storage
+      uses: azure/CLI@v1
+      with:
+        inlineScript: |
+            az storage blob upload-batch --account-name ${{ env.STORAGE_ACCOUNT_NAME }} -d '$web' --account-key ${{ secrets.STATIC_WEBSITE_ACCESS_KEY }} -s /output
+  
