@@ -33,4 +33,4 @@ jobs:
       uses: azure/CLI@v1
       with:
         inlineScript: |
-            az storage blob upload-batch --account-name ${{ env.STORAGE_ACCOUNT_NAME }} -d '$web' --account-key ${{ secrets.STATIC_WEBSITE_ACCESS_KEY }} -s ${{env.ROOT_PATH}}/dist
+            az storage blob upload-batch --account-name ${{ env.STORAGE_ACCOUNT_NAME }} -d '$web' --account-key ${{ secrets.STATIC_WEBSITE_ACCESS_KEY }} -s ${{env.ROOT_PATH}}/dist --overwrite
