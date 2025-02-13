@@ -303,6 +303,9 @@
 
       const typingIndicator = showTypingIndicator();
       const selectedRegulation = getSelectedRegulation();
+
+      console.log("Sending message with selected regulation:", selectedRegulation);
+
       try {
         const response = await fetch('http://localhost:7071/api/summarize', {
           method: 'POST',
@@ -344,7 +347,9 @@
     /* -------------------------------------------------------------------------- */
     async function loadConversation(conversationId) {
       try {
-        // POST /api/conversations/load  { conversationId, userId }
+        console.log(`Fetching conversation for conversationId: ${conversationId}`);
+
+        // Fetch conversation details
         const response = await fetch('http://localhost:7071/api/conversations/load', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -356,41 +361,71 @@
         }
 
         const messages = await response.json();
+        console.log('Retrieved conversation:', messages);
 
-        // Clear the chat entirely (including welcome message)
+        // Fetch regulations only once
+        console.log('Fetching regulations...');
+        const regulationsResponse = await fetch('http://localhost:7071/api/regulations', {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!regulationsResponse.ok) {
+          throw new Error('Failed to load regulations from the server.');
+        }
+
+        const regulations = await regulationsResponse.json();
+        console.log('Retrieved regulations:', regulations);
+
+        // Validate the conversation’s regulation
+        const selectedRegulation = regulations.find(reg => reg.partitionKey === messages.regulation);
+
+        if (!selectedRegulation) {
+          console.error(`Invalid regulation '${messages.regulation}' for conversation '${conversationId}'. Regulation not found.`);
+
+          // Display error message in the chat area
+          chatMessages.innerHTML = `
+            <div class="bg-red-100 text-red-700 p-4 rounded my-2">
+              Unable to load the conversation because the selected regulation is no longer available.
+            </div>
+          `;
+          return; // Stop further execution
+        }
+
+        console.log(`Valid regulation found: ${selectedRegulation.title} (${selectedRegulation.partitionKey})`);
+        
+        // Update the UI with the correct regulation
+        setSelectedRegulation(selectedRegulation);
+
+        // Clear the chat area
         chatMessages.innerHTML = '';
 
         // Check if the conversation contains a log
         if (messages.log && messages.log.length > 0) {
-          // Sort messages by sequence order
           messages.log.sort((a, b) => a.sequence - b.sequence);
-
-          // Display all messages in order
-          for (const msg of messages.log) {
-            // Display user prompt
+          messages.log.forEach(msg => {
             addMessage(msg.promptRaw, true);
-            // Display system response
             addMessage(msg.response, false);
-          }
+          });
         } else {
           addMessage('No messages found in this conversation.', false);
         }
 
-        // Update currentConversationId
+        // Update current conversation ID
         currentConversationId = conversationId;
         highlightActiveConversation();
 
-        // Scroll to bottom & focus the input
+        // Scroll chat to bottom
         chatMessages.scrollTop = chatMessages.scrollHeight;
         userInput.focus();
       } catch (error) {
         console.error('Error loading conversation:', error);
 
-        // Show an error message in the chat area
-        const errorDiv = document.createElement('div');
-        errorDiv.className = 'bg-red-100 text-red-700 p-4 rounded my-2';
-        errorDiv.textContent = 'Unable to load the conversation. Please try again.';
-        chatMessages.appendChild(errorDiv);
+        chatMessages.innerHTML = `
+          <div class="bg-red-100 text-red-700 p-4 rounded my-2">
+            Unable to load the conversation. Please try again later.
+          </div>
+        `;
       }
     }
 
@@ -438,14 +473,25 @@
         const button = document.createElement('button');
         button.className = 'w-full p-2 text-left hover:bg-gray-100 rounded';
         button.textContent = reg.title;
-        button.onclick = () => setSelectedRegulation(reg);
+        button.onclick = () => handleOnModalSelectedRegulation(reg);
         container.appendChild(button);
       });
     }
 
     function setSelectedRegulation(regulation) {
+      if (!regulation) {
+        console.error('setSelectedRegulation called with null/undefined regulation.');
+        return;
+      }
+      console.log(`Setting selected regulation: ${regulation.title} (${regulation.partitionKey})`);
       localStorage.setItem('selectedRegulation', JSON.stringify(regulation));
       displaySelectedRegulation(regulation);
+    }
+
+    function handleOnModalSelectedRegulation(regulation) {
+      setSelectedRegulation(regulation);
+
+      // Handle additional UI behaviors
       hideRegulationModal();
       enableChat();
       newChat();
