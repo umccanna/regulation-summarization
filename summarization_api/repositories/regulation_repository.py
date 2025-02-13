@@ -130,7 +130,7 @@ class RegulationRepository:
                 "promptRaw": item["promptRaw"],
                 "contextSummarized": item["contextSummarized"],
                 "factSheet": item["factSheet"],
-                "response": item["response"],
+                "response": item["response"] if "response" in item else "",
                 "directions": item["directions"],
                 "sequence": item["sequence"],
                 "created": item["created"]
