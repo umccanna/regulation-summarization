@@ -68,7 +68,12 @@
       const diffHours = Math.floor(diffMin / 60);
       const diffDays = Math.floor(diffHours / 24);
 
-      if (diffMin < 60) return `${diffMin} min`;
+      if (diffMin < 60) {
+        if (diffMin < 0) {
+          return '0 min';
+        }
+        return `${diffMin} min`;
+      }
       if (diffHours < 24) return `${diffHours} hours`;
       return `${diffDays} days`;
     }
@@ -80,7 +85,7 @@
     const chatForm = document.getElementById('chat-form');
     const userInput = document.getElementById('user-input');
     const sendButton = document.getElementById('send-button');
-    const resetButton = document.getElementById('reset-button');
+    const newChatButton = document.getElementById('new-chat-button');
     const typingTemplate = document.getElementById('typing-template');
     const closeButton = document.getElementById('close-regulation-modal');
 
@@ -137,24 +142,30 @@
       return generatedUserId;
     }
 
-    function newChat() {
+    function clearChatWindow() {
       // remove all messages except the welcome
       while (chatMessages.children.length > 1) {
         chatMessages.removeChild(chatMessages.lastChild);
       }
+    }
+
+    function newChat() {
+      // remove all messages except the welcome
+      clearChatWindow();
       currentConversationId = null;
       userInput.value = '';
       userInput.focus();
     }
 
-    function resetConversation() {
+    function handleOnNewChat() {
       newChat();
+      highlightActiveConversation();
     }
 
     async function sendMessage(message) {
       userInput.disabled = true;
       sendButton.disabled = true;
-      resetButton.disabled = true;
+      newChatButton.disabled = true;
 
       const typingIndicator = showTypingIndicator();
       const selectedRegulation = getSelectedRegulation();
@@ -192,7 +203,7 @@
       } finally {
         userInput.disabled = false;
         sendButton.disabled = false;
-        resetButton.disabled = false;
+        newChatButton.disabled = false;
         userInput.focus();
       }
     }
@@ -235,15 +246,18 @@
         // Validate the conversation’s regulation
         const selectedRegulation = regulations.find(reg => reg.partitionKey === messages.regulation);
 
+        // Clear the chat area
+        clearChatWindow();
+
         if (!selectedRegulation) {
           console.error(`Invalid regulation '${messages.regulation}' for conversation '${conversationId}'. Regulation not found.`);
 
+          const errorDiv = document.createElement('div');
+          errorDiv.className = 'bg-red-100 text-red-700 p-4 rounded my-2';
+          errorDiv.innerHTML = 'Unable to load the conversation because the selected regulation is no longer available.';
+    
           // Display error message in the chat area
-          chatMessages.innerHTML = `
-            <div class="bg-red-100 text-red-700 p-4 rounded my-2">
-              Unable to load the conversation because the selected regulation is no longer available.
-            </div>
-          `;
+          chatMessages.appendChild(errorDiv);
           return; // Stop further execution
         }
 
@@ -251,9 +265,6 @@
         
         // Update the UI with the correct regulation
         setSelectedRegulation(selectedRegulation);
-
-        // Clear the chat area
-        chatMessages.innerHTML = '';
 
         // Check if the conversation contains a log
         if (messages.log && messages.log.length > 0) {
@@ -350,6 +361,7 @@
       hideRegulationModal();
       enableChat();
       newChat();
+      highlightActiveConversation();
     }
 
     function getSelectedRegulation() {
@@ -394,7 +406,7 @@
         if (!hasRegulation) {
           disableChat();
         }
-        resetConversation();
+        handleOnNewChat();
       } finally {
         document.getElementById('initial-loading').remove();
       }
@@ -412,7 +424,7 @@
       await sendMessage(message);
     });
 
-    resetButton.addEventListener('click', resetConversation);
+    newChatButton.addEventListener('click', handleOnNewChat);
     closeButton.addEventListener('click', hideRegulationModal);
 
     // On DOM load, fetch conversation list & init chat
