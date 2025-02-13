@@ -2,7 +2,6 @@
     "name": "markdown-chat-server",
     "version": "1.0.0",
     "description": "Static file server for markdown chat interface",
-    "main": "server.js",
     "scripts": {
         "build": "parcel build src/index.html",
         "start": "parcel src/index.html"
