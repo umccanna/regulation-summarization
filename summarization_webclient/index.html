@@ -391,6 +391,7 @@
 
         console.log(`Valid regulation found: ${selectedRegulation.title} (${selectedRegulation.partitionKey})`);
         
+        // Update the UI with the correct regulation
         setSelectedRegulation(selectedRegulation);
 
         // Clear the chat area
@@ -410,6 +411,7 @@
         // Update current conversation ID
         currentConversationId = conversationId;
         highlightActiveConversation();
+
         // Scroll chat to bottom
         chatMessages.scrollTop = chatMessages.scrollHeight;
         userInput.focus();
@@ -419,27 +421,6 @@
         chatMessages.innerHTML = `
           <div class="bg-red-100 text-red-700 p-4 rounded my-2">
             Unable to load the conversation. Please try again later.
-          </div>
-        `;
-      }
-    }
-
-    function updateSelectedRegulation(selectedRegulation) {
-      if (selectedRegulation) {
-        console.log(`Updating UI with regulation: ${selectedRegulation.title} (${selectedRegulation.partitionKey})`);
-
-        // Update the UI to reflect the new regulation
-        const regulationDisplay = document.getElementById('selected-regulation');
-        regulationDisplay.textContent = `Selected: ${selectedRegulation.title}`;
-
-        // Ensure the "Change" button appears
-        document.getElementById('change-regulation').style.display = 'inline';
-      } else {
-        console.error('Attempted to update regulation, but selectedRegulation is null or undefined.');
-
-        chatMessages.innerHTML = `
-          <div class="bg-red-100 text-red-700 p-4 rounded my-2">
-            Unable to update the regulation display. Please refresh the page.
           </div>
         `;
       }
@@ -499,15 +480,9 @@
         console.error('setSelectedRegulation called with null/undefined regulation.');
         return;
       }
-
       console.log(`Setting selected regulation: ${regulation.title} (${regulation.partitionKey})`);
-
-      // Update the displayed text in the UI
-      const regulationDisplay = document.getElementById('selected-regulation');
-      regulationDisplay.textContent = `Selected: ${regulation.title}`;
-
-      // Show the "Change" button
-      document.getElementById('change-regulation').style.display = 'inline';
+      localStorage.setItem('selectedRegulation', JSON.stringify(regulation));
+      displaySelectedRegulation(regulation);
     }
 
     function handleOnModalSelectedRegulation(regulation) {
@@ -518,7 +493,6 @@
       enableChat();
       newChat();
     }
-
 
     function getSelectedRegulation() {
       const regulationString = localStorage.getItem('selectedRegulation');
