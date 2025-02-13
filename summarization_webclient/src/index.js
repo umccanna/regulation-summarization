@@ -1,156 +1,11 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Chat Interface</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    .typing-indicator {
-      display: flex;
-      gap: 4px;
-      padding: 12px;
-    }
-    .typing-dot {
-      width: 8px;
-      height: 8px;
-      background-color: #9CA3AF;
-      border-radius: 50%;
-      animation: typing-bounce 1.4s infinite ease-in-out;
-    }
-    .typing-dot:nth-child(1) {
-      animation-delay: 0s;
-    }
-    .typing-dot:nth-child(2) {
-      animation-delay: 0.2s;
-    }
-    .typing-dot:nth-child(3) {
-      animation-delay: 0.4s;
-    }
-    @keyframes typing-bounce {
-      0%, 80%, 100% { transform: translateY(0); }
-      40% { transform: translateY(-8px); }
-    }
-    @media (min-height: 800px) {
-      .chat-container { height: 80vh; }
-    }
-    .message-content ol {
-      list-style-type: decimal;
-      padding-left: 2.5rem;
-      margin: 1rem 0;
-    }
-    .message-content li {
-      margin-bottom: 0.5rem;
-    }
-    /* Highlight style for active conversation */
-    .active-conversation {
-      background-color: #bfdbfe !important; /* Tailwind's bg-blue-200 */
-    }
-  </style>
-</head>
-
-<body class="bg-gray-100 min-h-screen">
-  <div class="container mx-auto px-4 py-8 max-w-6xl">
-    <div class="flex gap-6">
-      <!-- Sidebar for Conversation History -->
-      <aside class="w-1/3 bg-white rounded-lg shadow-lg p-4 h-[80vh] overflow-y-auto">
-        <h2 class="text-lg font-semibold mb-4">Conversation History</h2>
-        <div id="conversation-list" class="space-y-2 text-sm text-gray-700">
-          <p class="text-gray-500">Loading conversations...</p>
-        </div>
-      </aside>
-
-      <!-- Main Chat Area (Original Chat Container) -->
-      <div class="bg-white rounded-lg shadow-lg p-6 chat-container flex flex-col flex-1">
-        <div class="flex justify-between items-center mb-4 pb-4 border-b">
-          <div class="flex items-center gap-4">
-            <h1 class="text-xl font-semibold">Chat Interface</h1>
-            <div class="flex items-center gap-2">
-              <div id="selected-regulation" class="text-sm text-gray-600"></div>
-              <button id="change-regulation" class="text-sm text-blue-500 hover:text-blue-700" style="display: none;">
-                Change
-              </button>
-            </div>
-          </div>
-          <button id="reset-button" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition-colors">
-            Reset Chat
-          </button>
-        </div>
-
-        <div id="regulation-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
-          <div class="bg-white p-6 rounded-lg max-w-md w-full">
-            <div class="flex justify-between items-center mb-4">
-              <h2 class="text-lg font-semibold">Select Regulation</h2>
-              <button id="close-regulation-modal" class="text-gray-500 hover:text-gray-700 hidden">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
-                     stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div id="regulation-loading" class="py-8 flex justify-center items-center hidden">
-              <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-            </div>
-            <div id="regulation-list" class="space-y-2 mb-4"></div>
-          </div>
-        </div>
-
-        <div id="initial-loading" class="fixed inset-0 bg-white flex items-center justify-center">
-          <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-        </div>
-
-        <div id="chat-messages" class="flex-1 space-y-4 overflow-y-auto mb-4" style="min-height: 500px;">
-          <!-- This is your initial "welcome" message -->
-          <div class="bg-blue-100 p-4 rounded">
-            <p>Welcome! How can I help you today?</p>
-          </div>
-        </div>
-
-        <form id="chat-form" class="flex gap-2 pt-4 border-t">
-          <input
-            type="text"
-            id="user-input"
-            class="flex-1 p-3 border rounded focus:outline-none focus:border-blue-500"
-            placeholder="Type your message..."
-            required
-            disabled
-          />
-          <button
-            type="submit"
-            id="send-button"
-            class="bg-blue-500 text-white px-6 py-3 rounded hover:bg-blue-600 transition-colors"
-            disabled
-          >
-            Send
-          </button>
-        </form>
-      </div>
-    </div>
-  </div>
-
-  <!-- Template for typing indicator -->
-  <template id="typing-template">
-    <div class="bg-gray-50 p-4 rounded">
-      <div class="typing-indicator">
-        <div class="typing-dot"></div>
-        <div class="typing-dot"></div>
-        <div class="typing-dot"></div>
-      </div>
-    </div>
-  </template>
-
-  <script>
-    /* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
     /*                            Conversation List Logic                          */
     /* -------------------------------------------------------------------------- */
     const conversationList = document.getElementById('conversation-list');
 
     async function fetchConversationHistory() {
       try {
-        const response = await fetch('http://localhost:7071/api/conversations/list', {
+        const response = await fetch(`${process.env.API_BASE_URL}/conversations/list`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId })
@@ -307,7 +162,7 @@
       console.log("Sending message with selected regulation:", selectedRegulation);
 
       try {
-        const response = await fetch('http://localhost:7071/api/summarize', {
+        const response = await fetch(`${process.env.API_BASE_URL}/summarize`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -350,7 +205,7 @@
         console.log(`Fetching conversation for conversationId: ${conversationId}`);
 
         // Fetch conversation details
-        const response = await fetch('http://localhost:7071/api/conversations/load', {
+        const response = await fetch(`${process.env.API_BASE_URL}/conversations/load`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ conversationId, userId })
@@ -365,7 +220,7 @@
 
         // Fetch regulations only once
         console.log('Fetching regulations...');
-        const regulationsResponse = await fetch('http://localhost:7071/api/regulations', {
+        const regulationsResponse = await fetch(`${process.env.API_BASE_URL}/regulations`, {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' }
         });
@@ -451,7 +306,7 @@
       regulationList.classList.add('hidden');
 
       try {
-        const response = await fetch('http://localhost:7071/api/regulations');
+        const response = await fetch(`${process.env.API_BASE_URL}/regulations`);
         if (!response.ok) {
           throw new Error('Failed to load regulations');
         }
@@ -565,6 +420,3 @@
       fetchConversationHistory();
       init();
     });
-  </script>
-</body>
-</html>

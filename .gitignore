@@ -166,3 +166,5 @@ selected_regulation.json
 
 node_modules
 summarization_api/config.py
+dist
+.parcel-cache
