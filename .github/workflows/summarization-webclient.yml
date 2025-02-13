@@ -14,11 +14,13 @@ jobs:
   deploy: 
     runs-on: ubuntu-latest
     steps:
+    - name: 'Checkout'
+      uses: actions/checkout@v4
+      
     - name: Stage Files
       shell: bash
       run: |
         mkdir ./output
-        ls
         cp ./summarization_webclient/index.html ./output/
         
     - name: Upload to Blob Storage
