@@ -15,8 +15,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Stage Files
+      shell: bash
       run: |
         mkdir ./output
+        ls
         cp ./summarization_webclient/index.html ./output/
         
     - name: Upload to Blob Storage
