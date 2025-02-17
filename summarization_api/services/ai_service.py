@@ -47,7 +47,7 @@ class AIService:
                 * When asked to provide page numbers look for the page number tag surrounding the text in the format of <Page {number}>{text}</Page {number}>
             '''
         
-        if regulation["partitionKey"] in ["AHEAD_NOFO_HAWAII_NARRATIVE"]:
+        if regulation["partitionKey"] in ["AHEAD_NOFO_ALL_STATE_NARRATIVES", "AHEAD_NOFO_HAWAII_NARRATIVE", "AHEAD_NOFO_VERMONT_NARRATIVE", "AHEAD_NOFO_CONNECTICUT_NARRATIVE", "AHEAD_NOFO_MARYLAND_NARRATIVE", "AHEAD_NOFO_NEW_YORK_NARRATIVE", "AHEAD_NOFO_RHODE_ISLAND_NARRATIVE"]:
             return '''
                 You are an Analyst that analyzes documents and provides concise and accurate summaries of the documents. 
                 Adhere to these high level guides when responding: 
@@ -138,7 +138,7 @@ class AIService:
                         Summarize the text provided in the 'Text:' below. If the text is suitable as a title, provide a concise and compelling title. 
                         Otherwise, generate a general summary. Do not include any labels or prefixes in the response. If a 'Max Length:' is provided, 
                         strictly limit the summary to that length, even if it means omitting page numbers or key numerical details. 
-                        Ensure any referenced page numbers (formatted as <Page number>text</Page number>) and important numerical values (such as factors, payments, or decimal values) 
+                        Ensure any referenced page numbers, document names, or document descriptions and important numerical values (such as factors, payments, or decimal values) 
                         are included unless constrained by the max length.
 
                         Text:
