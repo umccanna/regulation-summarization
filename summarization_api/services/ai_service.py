@@ -135,10 +135,11 @@ class AIService:
                 {
                     "role": "user",
                     "content": f'''
-                        Summarize the text provided in the "Text:" below.  Do not provide any additional information that is not related to the text provided. 
-                        Include page numbers from "Text:", if there are any referenced.  Page numbers are denoted in the format <Page number>text</Page number>.
-                        Pay special attention to any factors, payments, or decimal values and be sure they are included in the summary.
-                        If a "Max Length:" is provided then strictly limit the summary to the "Max Length:" even if that means ignoring page numbers or special numbers.
+                        Summarize the text provided in the 'Text:' below. If the text is suitable as a title, provide a concise and compelling title. 
+                        Otherwise, generate a general summary. Do not include any labels or prefixes in the response. If a 'Max Length:' is provided, 
+                        strictly limit the summary to that length, even if it means omitting page numbers or key numerical details. 
+                        Ensure any referenced page numbers (formatted as <Page number>text</Page number>) and important numerical values (such as factors, payments, or decimal values) 
+                        are included unless constrained by the max length.
 
                         Text:
                         {text}
