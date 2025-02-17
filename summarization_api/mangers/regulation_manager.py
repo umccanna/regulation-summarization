@@ -120,9 +120,13 @@ class RegulationManager:
             context = None
             context_summarized = None
             user_query = request["query"]
-            improved_user_query = self.__ai_service.improve_query(user_query, ai_formatted_conversation_history)    
-            print('Improved Query:', improved_user_query)
-
+            improved_user_query = user_query
+            if len(ai_formatted_conversation_history) > 0:
+                improved_user_query = self.__ai_service.improve_query(user_query, ai_formatted_conversation_history)    
+                logging.info(f'Improved Query: {improved_user_query}')
+            else: 
+                logging.info('Not improving query.  Not enough context to be of any assistance')
+                
             should_get_embeddings = self.__ai_service.should_pull_more_embeddings(improved_user_query, ai_formatted_conversation_history, selected_regulation)
             if should_get_embeddings:
                 generate_query_embeddings = self.__ai_service.generate_embeddings(improved_user_query)

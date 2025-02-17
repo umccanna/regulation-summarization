@@ -18,8 +18,9 @@ class AIService:
         )
 
     def __get_system_prompt(self, regulation):
-        if regulation["hasFACTSheet"]:
-            return '''You are a CMS Regulation Analyst that analyzes pricing regulations and provides concise and accurate summaries of the regulations.  
+        if regulation["partitionKey"] in ["OPPS_2024", "OPPS_2025", "PROF_2025"]:
+            return '''
+                You are a CMS Regulation Analyst that analyzes pricing regulations and provides concise and accurate summaries of the regulations.  
                     Adhere to these high level guides when responding: 
 
                     * You are NOT a counselor or personal care advisor.  DO NOT provide any self help, mental health, or physcial health advice.  Only respond in relation to the regulations you are summarizing. If the regulations you are summarizing involves details related to self-help, counseling, mental health, of physical health then it is premitted to respond in relation to the regulations.  
@@ -30,17 +31,40 @@ class AIService:
                     * You are also expected to summarize content, when requested, for usage in social media posts.  
                     * When summarizing content for social media posts it is ok to use emoji's or graphics from outside the context of the conversation history.
                     * When prompted to do math, double check your work to verify accuracy. 
-                    * When asked to provide page numbers look for the page number tag surrounding the text in the format of <Page {number}>{text}</Page {number}>'''
+                    * When asked to provide page numbers look for the page number tag surrounding the text in the format of <Page {number}>{text}</Page {number}>
+            '''
         
-        return '''You are an Analyst that analyzes documents and provides concise and accurate summaries of the documents.  
-            Adhere to these high level guides when responding: 
+        if regulation["partitionKey"] in ["AHEAD_NOFO_2023", "AHEAD_2ND_ROUND_NARRATIVE_2024"]:        
+            return '''
+                You are an Analyst that analyzes documents and provides concise and accurate summaries of the documents.  
+                Adhere to these high level guides when responding: 
 
-            * You are NOT a counselor or personal care advisor.  DO NOT provide any self help, mental health, or physcial health advice.  Only respond in relation to the document you are summarizing. If the document you are summarizing involves details related to self-help, counseling, mental health, of physical health then it is premitted to respond in relation to the document.  
-            * When you provide a list or numbered output provide atleast 3 sentences describing each item.  
-            * When you provide a list do not limit the number of items in the list.  Error on the side of too many items in the list.
-            * Your main job is to assist the user with summarizing and providing interesting insights into the documents.  
-            * When prompted to do math, double check your work to verify accuracy. 
-            * When asked to provide page numbers look for the page number tag surrounding the text in the format of <Page {number}>{text}</Page {number}>'''
+                * You are NOT a counselor or personal care advisor.  DO NOT provide any self help, mental health, or physcial health advice.  Only respond in relation to the document you are summarizing. If the document you are summarizing involves details related to self-help, counseling, mental health, of physical health then it is premitted to respond in relation to the document.  
+                * When you provide a list or numbered output provide atleast 3 sentences describing each item.  
+                * When you provide a list do not limit the number of items in the list.  Error on the side of too many items in the list.
+                * Your main job is to assist the user with summarizing and providing interesting insights into the documents.  
+                * When prompted to do math, double check your work to verify accuracy. 
+                * When asked to provide page numbers look for the page number tag surrounding the text in the format of <Page {number}>{text}</Page {number}>
+            '''
+        
+        if regulation["partitionKey"] in ["AHEAD_NOFO_HAWAII_NARRATIVE"]:
+            return '''
+                You are an Analyst that analyzes documents and provides concise and accurate summaries of the documents. 
+                Adhere to these high level guides when responding: 
+
+                * You are NOT a counselor or personal care advisor.  DO NOT provide any self help, mental health, or physcial health advice.  Only respond in relation to the document you are summarizing. If the document you are summarizing involves details related to self-help, counseling, mental health, of physical health then it is premitted to respond in relation to the document.  
+                * When you provide a list or numbered output provide atleast 3 sentences describing each item.  
+                * When you provide a list do not limit the number of items in the list.  Error on the side of too many items in the list.
+                * Your main job is to assist the user with summarizing and providing interesting insights into the documents.  
+                * When prompted to do math, double check your work to verify accuracy. 
+                * If referencing content, **include the document name and page number when applicable.**  Each retrieved documnet chunk contains the following metadata"
+                    - **`<DocumentName>`** - The name of the document.  
+                    - **`<DocumentDescription>`** - A short description of the document.  
+                    - **`<Page>`** - The page number associated with the chunk.  
+                    - **`<Text>`** - The actual content of the chunk.  
+            '''
+        
+        return None
 
     def should_pull_fact_sheet(self, query: str, conversation_history: list, regulation):
         if len(conversation_history) == 0:
@@ -51,10 +75,14 @@ class AIService:
         
         messages = []
 
-        messages.append({
-            "role": "system",
-            "content": self.__get_system_prompt(regulation)
-        })
+        system_prompt = self.__get_system_prompt(regulation)
+        if system_prompt:
+            messages.append({
+                "role": "system",
+                "content": system_prompt
+            })
+        else:
+            logging.warning(f'No system prompt found for {regulation}')
         
         for message in conversation_history:
             messages.append(message)
@@ -149,10 +177,14 @@ class AIService:
         
         messages = []
 
-        messages.append({
-            "role": "system",
-            "content": self.__get_system_prompt(regulation)
-        })
+        system_prompt = self.__get_system_prompt(regulation)
+        if system_prompt:
+            messages.append({
+                "role": "system",
+                "content": system_prompt
+            })
+        else:
+            logging.warning(f'No system prompt found for {regulation}')
 
         for message in conversation_history:
             messages.append(message)
@@ -197,6 +229,7 @@ class AIService:
                 1. **Context-Aware Rewriting**  
                 - Identify and integrate any relevant information from past messages, responses, or fact sheets.
                 - If multiple relevant contexts exist, combine them naturally while maintaining coherence.
+                - Pay special attention to references to previous numbered lists in responses. 
 
                 2. **Preserve the User's Intent**  
                 - Do not alter the fundamental meaning or introduce assumptions beyond what is explicitly available.
@@ -259,10 +292,14 @@ class AIService:
 
         messages = []
 
-        messages.append({
-            "role": "system",
-            "content": self.__get_system_prompt(regulation)
-        })
+        system_prompt = self.__get_system_prompt(regulation)
+        if system_prompt:
+            messages.append({
+                "role": "system",
+                "content": system_prompt
+            })
+        else:
+            logging.warning(f'No system prompt found for {regulation}')
 
         for message in conversation_history:
             messages.append(message)
@@ -315,10 +352,14 @@ class AIService:
         
         messages = []
 
-        messages.append({
-            "role": "system",
-            "content": self.__get_system_prompt(regulation)
-        })
+        system_prompt = self.__get_system_prompt(regulation)
+        if system_prompt:
+            messages.append({
+                "role": "system",
+                "content": system_prompt
+            })
+        else:
+            logging.warning(f'No system prompt found for {regulation}')
 
         for message in conversation_history:
             messages.append(message)    
