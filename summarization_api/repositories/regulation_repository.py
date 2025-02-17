@@ -117,25 +117,33 @@ class RegulationRepository:
         if not conversation_id:
             return None
         
-        logging.info(f'Getting conversation by id {conversation_id}')
+        logging.info(f'Getting conversation by id {conversation_id} with latest 5 exchanges')
 
         container = self.__database.get_container_client("conversations")
         conversation_log = []
         for item in container.query_items(
-            query="SELECT c.promptRaw, c.contextSummarized, c.factSheet, c.response, c.directions, c.sequence, c.created, c.promptImproved FROM c WHERE c.conversationId = @ConversationId AND c.type = 'ConversationLog' ORDER BY c.sequence ASC",
+            query="""
+            SELECT TOP 5 
+                c.promptRaw, c.contextSummarized, c.factSheet, c.response, 
+                c.directions, c.sequence, c.created 
+            FROM c 
+            WHERE c.conversationId = @ConversationId 
+            AND c.type = 'ConversationLog' 
+            ORDER BY c.sequence DESC
+            """,
             parameters=[{"name":"@ConversationId", "value": conversation_id}],
             partition_key=user_id
         ):
             conversation_log.append({
                 "promptRaw": item["promptRaw"],
-                "promptImproved": item["promptImproved"] if "promptImproved" in item else "",
                 "contextSummarized": item["contextSummarized"],
                 "factSheet": item["factSheet"],
-                "response": item["response"] if "response" in item else "",
+                "response": item["response"],
                 "directions": item["directions"],
                 "sequence": item["sequence"],
                 "created": item["created"]
             })
+        conversation_log.reverse()
         
         conversation_item = container.read_item(conversation_id, partition_key=user_id)
         return self.__convert_from_cosmos_conversation(conversation_item, conversation_log)
