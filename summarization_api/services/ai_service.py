@@ -183,6 +183,77 @@ class AIService:
 
         return decision.lower().strip() == 'yes'
     
+    def improve_query(self, query: str, conversation_history: list):
+        openai_client = self.__get_client()
+
+        messages = []
+
+        messages.append({
+            "role": "system",
+            "content": '''
+                Your task is to rewrite and improve user queries by incorporating relevant context from previous messages, responses, and fact sheets. The goal is to refine the query for better clarity, specificity, and completeness while preserving the user's original intent.
+
+                ### **Rules for Query Enhancement:**
+                1. **Context-Aware Rewriting**  
+                - Identify and integrate any relevant information from past messages, responses, or fact sheets.
+                - If multiple relevant contexts exist, combine them naturally while maintaining coherence.
+
+                2. **Preserve the User's Intent**  
+                - Do not alter the fundamental meaning or introduce assumptions beyond what is explicitly available.
+
+                3. **Improve Clarity & Precision**  
+                - Make the query clearer and more informative without unnecessary verbosity.
+                - Resolve vague or ambiguous wording where possible.
+
+                4. **Avoid Redundancy or Overloading**  
+                - Do not include excessive details that do not add value.
+                - Ensure the rewritten query remains concise and natural.
+
+                5. **Edge Case Handling**  
+                - If no relevant context is found, return the original query unchanged.
+
+                ### **Output Format:**  
+                - Return only the rewritten and improved query, with no additional explanations or commentary.
+                - If no relevant context exists, return the original user query as-is.
+
+                Failure to follow these rules will result in incorrect behavior.
+            '''
+        })
+        
+        for message in conversation_history:
+            messages.append(message)
+
+        messages.append({
+            "role": "user",
+            "content": f'''
+                Analyze the "Prompt:" and improve it by incorporating relevant context from previous messages, responses, or fact sheets.  
+
+                ### **Guidelines for Query Improvement:**
+                - **Enhance Clarity & Completeness** - Ensure the rewritten query is more precise and informative.
+                - **Naturally Integrate Relevant Context** - If past context helps refine the query, seamlessly incorporate it.
+                - **Preserve the User's Intent** - Do not change the meaning of the original query.
+                - **Avoid Redundant or Unnecessary Details** - Only include what strengthens the query.
+                - **Maintain a Natural Tone** - Ensure the rewritten query feels human-like and intuitive.
+
+                If no relevant context is found, return the original "Prompt:" unchanged.
+
+                ---
+
+                Prompt:  
+                {query}
+            '''
+        })
+        
+        chat_completion = openai_client.chat.completions.create(
+            messages=messages,
+            model=get_config("ChatModel")
+        )
+
+        response_content = chat_completion.choices[0].message.content
+
+        return response_content
+
+    
     def call_with_context(self, context: str, conversation_history: list, regulation, directions: str, fact_sheet: str, query: str):
         openai_client = self.__get_client()
 

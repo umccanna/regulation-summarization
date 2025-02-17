@@ -21,15 +21,17 @@ class RegulationManager:
     def get_conversations(self, user_id):
         return self.__regulation_repository.get_conversations(user_id)
 
-    def __convert_conversation_history_to_ai_format(self, conversation_log: list):
+    def __convert_conversation_history_to_ai_format(self, conversation_log: list, use_raw_prompt: bool):
         converted_history = []
 
         for log in conversation_log:
+            prompt = log["promptRaw"] if use_raw_prompt or "promptImproved" not in log or log["promptImproved"] == "" else log["promptImproved"]
+
             content_parts = [f'''
                 {log["directions"]}
 
                 Prompt: 
-                {log["promptRaw"]}
+                {prompt}
             ''']
             
             if log["contextSummarized"]:
@@ -64,16 +66,24 @@ class RegulationManager:
     
     def __get_directions_with_context(self):
         return '''
-            Only provide responses that can be found "Context:" provided below or from the "Context:" in any of the previous messages or any of your previous responses or any previous "Fact Sheet:" based on the user's "Prompt:" .  
-            If you are unable to find a response in the below "Context:" or any previous message "Context:" or any of your previous respsonses or any previous "Fact Sheet:" do not make anything up.  Just response with "I'm not sure how to help you with that.  I may not have been designed to help with your request.".
-            If a "Fact Sheet:" is provided use that content to inform and focus the response.
+            Use the "Context:" provided below, any previous message "Context:", your previous responses, or any previous "Fact Sheet:" to respond to the user's "Prompt:".  
+            - If the answer is explicitly stated in the "Context:", prioritize that information.  
+            - If the answer is not directly stated but can be **reasonably inferred** using logical deduction from the provided "Context:" or "Fact Sheet:", do so.  
+            - If you cannot infer a reasonable answer from the provided information, respond with: "I'm not sure how to help you with that. I may not have been designed to help with your request."
+
+            When responding, ensure that all reasoning is grounded in the provided "Context:", previous "Fact Sheet:", or prior responses. Do **not** make up information beyond what can be logically inferred. 
+
         '''
     
     def __get_directions_without_context(self):
         return '''
-            Only provide responses that can be found in any previous message "Context:" or any previous message "Fact Sheet:" or any of previous your responses based on the user's "Prompt:".
-            If you are unable to find a response in any previous message "Context:" or any previous message "Fact Sheet:" or any of your previous responses do not make anything up.  Just response with "I'm not sure how to help you with that.  I may not have been designed to help with your request.".
-            If a "Fact Sheet:" is provided use that content to inform and focus the response. 
+            Only provide responses based on any previous message "Context:", any previous "Fact Sheet:", or any of your previous responses when answering the user's "Prompt:".  
+            - If the answer is explicitly stated in any previous "Context:", "Fact Sheet:", or prior responses, use that information.  
+            - Do **not** generate new information or infer beyond what has been stated in prior responses.  
+            - If no relevant information exists in previous "Context:", "Fact Sheet:", or responses, reply with:  
+            **"I'm not sure how to help you with that. I may not have been designed to help with your request."**  
+
+            If a "Fact Sheet:" is provided, prioritize its content to inform and focus the response. 
         '''
 
     def query_regulation(self, request):
@@ -85,7 +95,7 @@ class RegulationManager:
                 summarized_query = self.__ai_service.summarize_text(request["query"], 30)
                 conversation = self.__regulation_repository.create_conversation(request["userId"], summarized_query, request["regulation"])
 
-            ai_formatted_conversation_history = self.__convert_conversation_history_to_ai_format(conversation["log"])
+            ai_formatted_conversation_history = self.__convert_conversation_history_to_ai_format(conversation["log"], False)
             already_has_fact_sheet = False
             for log in conversation["log"]:
                 if log["factSheet"]:
@@ -109,10 +119,13 @@ class RegulationManager:
             response = None
             context = None
             context_summarized = None
+            user_query = request["query"]
+            improved_user_query = self.__ai_service.improve_query(user_query, ai_formatted_conversation_history)    
+            print('Improved Query:', improved_user_query)
 
-            should_get_embeddings = self.__ai_service.should_pull_more_embeddings(request["query"], ai_formatted_conversation_history, selected_regulation)
+            should_get_embeddings = self.__ai_service.should_pull_more_embeddings(improved_user_query, ai_formatted_conversation_history, selected_regulation)
             if should_get_embeddings:
-                generate_query_embeddings = self.__ai_service.generate_embeddings(request["query"])
+                generate_query_embeddings = self.__ai_service.generate_embeddings(improved_user_query)
                 embeddings = self.__regulation_repository.query_embeddings(generate_query_embeddings, selected_regulation)
                 if len(embeddings) == 0:
                     logging.error("No matches found in vector database. Querying without additional embeddings")
@@ -122,7 +135,7 @@ class RegulationManager:
                         selected_regulation,
                         directions,
                         fact_sheet,
-                        request["query"]
+                        improved_user_query
                     )
                 else:
                     directions = self.__get_directions_with_context()
@@ -134,7 +147,7 @@ class RegulationManager:
                         selected_regulation,
                         directions,
                         fact_sheet,
-                        request["query"]
+                        improved_user_query
                     )
                     
             else:
@@ -144,19 +157,21 @@ class RegulationManager:
                     selected_regulation,
                     directions,
                     fact_sheet,
-                    request["query"]
+                    improved_user_query
                 )
 
             self.__regulation_repository.save_conversation_log({
                 "conversationId": conversation["id"],
                 "userId": request["userId"],
-                "promptRaw": request["query"],
+                "promptRaw": user_query,
+                "promptImproved": improved_user_query,
                 "contextRaw": context,
                 "contextSummarized": context_summarized,
                 "factSheet": fact_sheet,
                 "directions": directions,
                 "response": response
             })
+
             return {
                 "result": response,
                 "conversationId": conversation["id"]

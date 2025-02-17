@@ -122,12 +122,13 @@ class RegulationRepository:
         container = self.__database.get_container_client("conversations")
         conversation_log = []
         for item in container.query_items(
-            query="SELECT c.promptRaw, c.contextSummarized, c.factSheet, c.response, c.directions, c.sequence, c.created FROM c WHERE c.conversationId = @ConversationId AND c.type = 'ConversationLog' ORDER BY c.sequence ASC",
+            query="SELECT c.promptRaw, c.contextSummarized, c.factSheet, c.response, c.directions, c.sequence, c.created, c.promptImproved FROM c WHERE c.conversationId = @ConversationId AND c.type = 'ConversationLog' ORDER BY c.sequence ASC",
             parameters=[{"name":"@ConversationId", "value": conversation_id}],
             partition_key=user_id
         ):
             conversation_log.append({
                 "promptRaw": item["promptRaw"],
+                "promptImproved": item["promptImproved"] if "promptImproved" in item else "",
                 "contextSummarized": item["contextSummarized"],
                 "factSheet": item["factSheet"],
                 "response": item["response"] if "response" in item else "",
@@ -176,6 +177,7 @@ class RegulationRepository:
                 "conversationId": request["conversationId"],
                 "partitionKey": request["userId"],
                 "promptRaw": request["promptRaw"],
+                "promptImproved": request["promptImproved"],
                 "contextRaw": request["contextRaw"],
                 "contextSummarized": request["contextSummarized"],
                 "factSheet": request["factSheet"],
