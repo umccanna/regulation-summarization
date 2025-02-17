@@ -136,9 +136,10 @@ class RegulationRepository:
         ):
             conversation_log.append({
                 "promptRaw": item["promptRaw"],
+                "promptImproved": item["promptImproved"] if "promptImproved" in item else "",
                 "contextSummarized": item["contextSummarized"],
                 "factSheet": item["factSheet"],
-                "response": item["response"],
+                "response": item["response"] if "response" in item else "",
                 "directions": item["directions"],
                 "sequence": item["sequence"],
                 "created": item["created"]
