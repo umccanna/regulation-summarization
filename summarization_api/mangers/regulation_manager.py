@@ -95,7 +95,12 @@ class RegulationManager:
                 summarized_query = self.__ai_service.summarize_text(request["query"], 30)
                 conversation = self.__regulation_repository.create_conversation(request["userId"], summarized_query, request["regulation"])
 
-            ai_formatted_conversation_history = self.__convert_conversation_history_to_ai_format(conversation["log"], False)
+            # Limit messages sent to OpenAI (e.g., last 5)
+            CONTEXT_LIMIT = 7
+            limited_conversation_log = conversation["log"][-CONTEXT_LIMIT:] if len(conversation["log"]) > CONTEXT_LIMIT else conversation["log"]
+
+
+            ai_formatted_conversation_history = self.__convert_conversation_history_to_ai_format(limited_conversation_log, False)
             already_has_fact_sheet = False
             for log in conversation["log"]:
                 if log["factSheet"]:

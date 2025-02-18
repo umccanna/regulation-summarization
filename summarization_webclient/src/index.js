@@ -99,11 +99,15 @@
       headerIds: false
     });
 
-    function addMessage(content, isUser = false) {
+    function addMessage(content, isUser = false, isInContext = true) {
       const messageDiv = document.createElement('div');
       messageDiv.className = isUser
         ? 'bg-blue-50 p-4 rounded'
         : 'bg-gray-50 p-4 rounded message-content';
+
+      if (!isInContext) {
+        messageDiv.classList.add('faded-message');
+      }
 
       if (isUser) {
         messageDiv.textContent = content;
@@ -191,11 +195,15 @@
         removeTypingIndicator(typingIndicator);
         currentConversationId = data.conversationId;
 
-        addMessage(data.result, false);
+        addMessage(data.result, false, true);
 
         // Reload conversation list to keep updated
         await fetchConversationHistory();
         highlightActiveConversation();
+
+        // Gray out out of context messages immediately after sending a new message
+        updateGrayedOutMessages();
+
       } catch (error) {
         removeTypingIndicator(typingIndicator);
         addMessage('Sorry, there was an error processing your request. Please try again.');
@@ -269,14 +277,21 @@
         // Check if the conversation contains a log
         if (messages.log && messages.log.length > 0) {
           messages.log.sort((a, b) => a.sequence - b.sequence);
-          messages.log.forEach(msg => {
-            addMessage(msg.promptRaw, true);
-            addMessage(msg.response, false);
+
+          const contextLimit = 7;
+          const totalMessages = messages.log.length;
+          const inContextStartIndex = totalMessages > contextLimit ? totalMessages - contextLimit : 0;
+
+          messages.log.forEach((msg, index) => {
+            const isInContext = index >= inContextStartIndex;
+            addMessage(msg.promptRaw, true, isInContext);
+            addMessage(msg.response, false, isInContext);
           });
         } else {
           addMessage('No messages found in this conversation.', false);
         }
 
+        updateGrayedOutMessages();
         // Update current conversation ID
         currentConversationId = conversationId;
         highlightActiveConversation();
@@ -399,6 +414,51 @@
       userInput.disabled = true;
       sendButton.disabled = true;
     }
+
+    function updateGrayedOutMessages() {
+      const allMessages = document.querySelectorAll("#chat-messages > div");
+      const contextLimit = 7;
+      const separatorMessageId = "out-of-scope-separator";
+
+      console.log("Updating grayed-out messages...");
+
+      const existingSeparator = document.getElementById(separatorMessageId);
+      if (existingSeparator) {
+        console.log("Removing existing separator...");
+        existingSeparator.remove();
+      }
+    
+      /* multiply by 2 to get message as well as response */
+      if (allMessages.length <= contextLimit * 2) {
+        console.log("Not enough messages to apply graying out.");
+        return;
+      }  
+
+      const startGrayIndex = allMessages.length - (contextLimit * 2);
+      let lastGrayedOutIndex = null;
+        
+      allMessages.forEach((msg, index) => {
+        if (index < startGrayIndex) {
+          msg.classList.add("faded-message");
+          lastGrayedOutIndex = index;
+        } else {
+          msg.classList.remove("faded-message");
+        }
+      });
+
+      if (lastGrayedOutIndex !== null && lastGrayedOutIndex < allMessages.length - 1) {
+        const separator = document.createElement("div");
+        separator.id = separatorMessageId;
+        separator.className = "separator-message";
+        separator.textContent =
+          "The previous messages are considered out of scope to the current conversation but will be retained.";
+        
+        console.log(`Adding separator after message index: ${lastGrayedOutIndex}`);
+        allMessages[lastGrayedOutIndex].after(separator);
+      } else {
+        console.warn("No valid place found to insert the separator.");
+      }
+    }    
 
     async function init() {
       try {
