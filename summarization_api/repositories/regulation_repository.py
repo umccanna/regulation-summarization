@@ -123,7 +123,7 @@ class RegulationRepository:
         conversation_log = []
         for item in container.query_items(
             query="""
-            SELECT TOP 5 
+            SELECT 
                 c.promptRaw, c.contextSummarized, c.factSheet, c.response, 
                 c.directions, c.sequence, c.created 
             FROM c 

@@ -48,6 +48,21 @@
     .active-conversation {
       background-color: #bfdbfe !important; /* Tailwind's bg-blue-200 */
     }
+    /* Out of Context Conversation */
+    .faded-message {
+      opacity: 0.5; 
+      filter: grayscale(50%);
+    }
+    /* message separater to separate regular messages and out of context */
+    .separator-message {
+      text-align: center;
+      font-size: 0.9rem;
+      color: #6b7280; /* Tailwind's gray-500 */
+      margin: 10px 0;
+      font-style: italic;
+      border-top: 1px solid #d1d5db; /* Tailwind's gray-300 */
+      padding-top: 5px;
+    }
   </style>
 </head>
 
