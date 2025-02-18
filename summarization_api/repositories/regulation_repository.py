@@ -125,7 +125,7 @@ class RegulationRepository:
             query="""
             SELECT 
                 c.promptRaw, c.contextSummarized, c.factSheet, c.response, 
-                c.directions, c.sequence, c.created 
+                c.directions, c.sequence, c.created, c.promptImproved
             FROM c 
             WHERE c.conversationId = @ConversationId 
             AND c.type = 'ConversationLog' 
