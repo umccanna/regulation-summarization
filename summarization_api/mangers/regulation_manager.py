@@ -78,12 +78,18 @@ class RegulationManager:
     def __get_directions_without_context(self):
         return '''
             Only provide responses based on any previous message "Context:", any previous "Fact Sheet:", or any of your previous responses when answering the user's "Prompt:".  
-            - If the answer is explicitly stated in any previous "Context:", "Fact Sheet:", or prior responses, use that information.  
-            - Do **not** generate new information or infer beyond what has been stated in prior responses.  
-            - If no relevant information exists in previous "Context:", "Fact Sheet:", or responses, reply with:  
-            **"I'm not sure how to help you with that. I may not have been designed to help with your request."**  
 
-            If a "Fact Sheet:" is provided, prioritize its content to inform and focus the response. 
+            - If the answer is explicitly stated in any previous "Context:", "Fact Sheet:", or prior responses, use that information verbatim or summarize it accurately.  
+            - If the answer is not explicitly stated but can be **reasonably inferred** from existing "Context," "Fact Sheet," or previous responses, provide a response **only if it aligns logically with known information**.  
+            - If no relevant information exists, respond with:  
+            **"I'm not sure how to help you with that. The available information does not contain an answer to your request."**  
+
+            **Inference Rules:**  
+            - You may **reword or synthesize** known facts, but do not introduce **new** details or assumptions.  
+            - If prior responses imply a partial answer, clarify what is known while noting any missing details.  
+
+            If a "Fact Sheet:" is provided, prioritize its content to inform and focus the response.
+ 
         '''
 
     def query_regulation(self, request):
@@ -92,7 +98,7 @@ class RegulationManager:
 
             conversation = self.__regulation_repository.get_conversation(request["userId"], request["conversationId"]) if request["conversationId"] else None
             if not conversation:
-                summarized_query = self.__ai_service.summarize_text(request["query"], 30)
+                summarized_query = self.__ai_service.generate_title(request["query"], 30)
                 conversation = self.__regulation_repository.create_conversation(request["userId"], summarized_query, request["regulation"])
 
             # Limit messages sent to OpenAI (e.g., last 5)
@@ -132,34 +138,12 @@ class RegulationManager:
             else: 
                 logging.info('Not improving query.  Not enough context to be of any assistance')
                 
-            should_get_embeddings = self.__ai_service.should_pull_more_embeddings(improved_user_query, ai_formatted_conversation_history, selected_regulation)
-            if should_get_embeddings:
-                generate_query_embeddings = self.__ai_service.generate_embeddings(improved_user_query)
-                embeddings = self.__regulation_repository.query_embeddings(generate_query_embeddings, selected_regulation)
-                if len(embeddings) == 0:
-                    logging.error("No matches found in vector database. Querying without additional embeddings")
-                    directions = self.__get_directions_without_context()
-                    response = self.__ai_service.call_without_context(
-                        ai_formatted_conversation_history,
-                        selected_regulation,
-                        directions,
-                        fact_sheet,
-                        improved_user_query
-                    )
-                else:
-                    directions = self.__get_directions_with_context()
-                    context = " ".join([i["text"] for i in embeddings])
-                    context_summarized = self.__ai_service.summarize_text(context)
-                    response = self.__ai_service.call_with_context(
-                        context, 
-                        ai_formatted_conversation_history, 
-                        selected_regulation,
-                        directions,
-                        fact_sheet,
-                        improved_user_query
-                    )
-                    
-            else:
+            # should_get_embeddings = self.__ai_service.should_pull_more_embeddings(improved_user_query, ai_formatted_conversation_history, selected_regulation)
+            # if should_get_embeddings:
+            generate_query_embeddings = self.__ai_service.generate_embeddings(improved_user_query)
+            embeddings = self.__regulation_repository.query_embeddings(generate_query_embeddings, selected_regulation)
+            if len(embeddings) == 0:
+                logging.error("No matches found in vector database. Querying without additional embeddings")
                 directions = self.__get_directions_without_context()
                 response = self.__ai_service.call_without_context(
                     ai_formatted_conversation_history,
@@ -168,6 +152,29 @@ class RegulationManager:
                     fact_sheet,
                     improved_user_query
                 )
+            else:
+                directions = self.__get_directions_with_context()
+                context = " ".join([i["text"] for i in embeddings])
+
+                context_summarized = self.__ai_service.summarize_text(context)
+                response = self.__ai_service.call_with_context(
+                    context, 
+                    ai_formatted_conversation_history, 
+                    selected_regulation,
+                    directions,
+                    fact_sheet,
+                    improved_user_query
+                )
+                    
+            # else:
+            #     directions = self.__get_directions_without_context()
+            #     response = self.__ai_service.call_without_context(
+            #         ai_formatted_conversation_history,
+            #         selected_regulation,
+            #         directions,
+            #         fact_sheet,
+            #         improved_user_query
+            #     )
 
             self.__regulation_repository.save_conversation_log({
                 "conversationId": conversation["id"],
