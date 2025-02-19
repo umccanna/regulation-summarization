@@ -114,16 +114,65 @@ class AIService:
 
         return decision.lower().strip() == 'yes'
     
-    def summarize_text(self, text: str, summary_max_length: int=None):
+    def generate_title(self, text: str, max_length: int):
+        openai_client = self.__get_client()
+
+        logging.info('Getting title based on question')
+
+        chat_completion = openai_client.chat.completions.create(
+            messages=[
+                {
+                    "role": "user",
+                    "content": f'''
+                        Provide a title that captures the main idea of the "Text:" below.  The title will be used for a chat title and should be no longer than the "Max Length:"
+
+                        Text:
+                        {text}
+
+                        Max Length:
+                        {max_length}
+                    '''
+                }
+            ],
+            model=get_config("ChatModel")
+        )
+
+        return chat_completion.choices[0].message.content
+
+    def summarize_text(self, text: str):
         openai_client = self.__get_client()
 
         logging.info('Summarizing text')
 
-        if summary_max_length is not None:
-            text = f'''
-                Max Length: {summary_max_length}
+        structured_text_directions = ''
+        if "<Chunk>" in text:
+            structured_text_directions = '''
+                - **Maintain structured output when applicable**:
+                - If multiple chunks share the **same Document Name and Page**, summarize their text **together** in a single summary.
+                - Chunks will be formatted like:
+                    
+                xml
+                    <Chunk>
+                    <DocumentName>{{DocumentName}}</DocumentName>
+                    <DocumentDescription>{{DocumentDescription}}</DocumentDescription>
+                    <Page>{{Page}}</Page>
+                    <Text>{{Text Content}}</Text>
+                    </Chunk>
 
-                {text}
+                - Each **unique Document Name and Page** should receive its own summary.
+            '''
+        elif "<Page " in text:
+            structured_text_directions = '''
+                - **Maintain structured output when applicable**:
+                - If multiple chunks share the **same Page**, summarize their text **together** in a single summary.
+                - Chunks will be formatted like:
+                    
+                xml
+                    <Page {{Page}}>
+                    {{Text Content}}
+                    </Page {{Page}}>
+
+                - Each **unique Page** should receive its own summary.
             '''
 
         chat_completion = openai_client.chat.completions.create(
@@ -135,11 +184,23 @@ class AIService:
                 {
                     "role": "user",
                     "content": f'''
-                        Summarize the text provided in the 'Text:' below. If the text is suitable as a title, provide a concise and compelling title. 
-                        Otherwise, generate a general summary. Do not include any labels or prefixes in the response. If a 'Max Length:' is provided, 
-                        strictly limit the summary to that length, even if it means omitting page numbers or key numerical details. 
-                        Ensure any referenced page numbers, document names, or document descriptions and important numerical values (such as factors, payments, or decimal values) 
-                        are included unless constrained by the max length.
+                    Summarize the text provided in the "Text:" below while preserving key details and clarity.  
+
+                    ### **Guidelines for Summarization:**
+                    - Provide a **detailed general summary** that captures all significant information.  
+                    {structured_text_directions}
+
+                    ### **Handling of Important Details:**
+                    - **Retain all critical information**, including **document names, descriptions, page numbers, and numerical values** (such as factors, payments, decimal values).  
+                    - **Preserve numerical values and citations whenever possible** by omitting background details first.  
+
+                    ### **Output Format:**
+                    - If structured output is required, **return summaries in XML-style <Chunk> format** per **Document Name and Page**.
+                    - If structured output is not required, return a **concise but complete summary** without labels or prefixes.
+
+                    Ensure the summary is **informative, structured where needed, and accurately represents the full content** without unnecessary condensation.
+
+                    Text:
 
                         Text:
                         {text}
