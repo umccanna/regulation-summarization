@@ -2,3 +2,6 @@ pdfplumber
 openai
 python-dotenv
 azure-cosmos
+pillow
+pdf2image
+pytesseract

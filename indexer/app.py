@@ -7,6 +7,11 @@ import getopt
 import sys
 from pathlib import Path 
 import json
+from PIL import Image
+from io import BytesIO
+from pdf2image import convert_from_path
+import uuid
+import pytesseract
 
 def normalize_text(text: str):
     text = re.sub(r'\s+',  ' ', text).strip()
@@ -95,6 +100,142 @@ def delete_document_type(document_type: str):
             print(f'Deleted {deleted_count} items')
     
     print(f'Deleted {deleted_count} items')
+
+def chunk_text(text, openai_client):
+    if get_config("UseAIChunking"):
+        messages = [{
+            "role": "user",
+            "content": f'''
+                Take the following "Text:" and break it into logically grouped chunks, ensuring each chunk maintains contextual meaning. 
+                    * Keep all original text intact. Separate the chunks using |||| as a delimiter, outputting the result as a single line. 
+                    * Do not add extra characters or summaries, —just return the original text chunked appropriately.  
+                    * Remove any chunks that aren't necessary for RAG. 
+                    * Remove any emails, phone numbers, web addresses.
+                    * If there is no text provided then simply respond with "No Chunks"
+
+                Text:
+                {text}
+            ''',
+        }]
+
+        chat_completion = openai_client.chat.completions.create(
+            messages=messages,
+            model=get_config("ChatModel")
+        )
+
+        chunked_text = chat_completion.choices[0].message.content.strip()
+        return chunked_text.split("||||") if chunked_text != "No Chunks" else ""
+    
+    normalized_page_text = strip_emails_and_phone_numbers_and_web_addresses(text)
+    normalized_page_text = normalize_text(text)
+    return normalized_page_text.split(get_config("ChunkingCharacter"))
+
+
+def index_using_pdf_to_image(document, chunk_size, spooling_size, cosmos_container, overlap_size, openai_client, total_chunks, total_chunks_uploaded):    
+    chunk_accumulator = []
+    text_accumulator = []
+
+    run_directory_name = str(uuid.uuid4())
+    run_directory_path = Path(get_config("TempImageLocation")).joinpath(run_directory_name)
+    raw_directory_path = run_directory_path.joinpath("raw")
+    raw_directory_path.mkdir(exist_ok=True, parents=True)
+
+    print(f'Converting pages to image here: {raw_directory_path}')
+    images = convert_from_path(document["Location"], output_folder=raw_directory_path)
+    print(f"Created {len(images)} image pages")
+    for i, page_image in enumerate(images):
+        print(f"Processing page {i+1}")
+        page_image.save(run_directory_path.joinpath(f"page_{i+1}.png"), "PNG")
+        text = pytesseract.image_to_string(page_image)
+        with open(run_directory_path.joinpath(f"page_text_raw_{i+1}.txt"), "w") as w:
+            w.write(text) 
+
+        normalized_text = normalize_text(text)
+
+        with open(run_directory_path.joinpath(f"page_text_normalized_{i+1}.txt"), "w") as w:
+            w.write(normalized_text) 
+
+        normalized_text = normalized_text.strip()
+        if len(normalized_text) <= 3:
+            print(f"Skipping page, there is probably nothing of value to index. Text: '{normalized_text}'")
+            continue
+
+        chunks = chunk_text(normalized_text, openai_client)
+        
+        with open(run_directory_path.joinpath(f"page_text_chunks_{i+1}.txt"), "w") as w:
+            w.write(json.dumps(chunks)) 
+            
+        if len(chunks) <= 3:
+            print(f"QUALITY CONTROL!!!!")
+            print(f"Only {len(chunks)} Chunks Found. Chunks: {chunks}")
+
+        for text_chunk in chunks:
+            cleaned_up_text = text_chunk.strip()
+            # we don't want to index empty strings
+            if len(cleaned_up_text) == 0:
+                continue
+
+            text_accumulator.append(f'<Chunk><DocumentName>{document["Name"]}</DocumentName><DocumentDescription>{document["Description"]}</DocumentDescription><Page>{i+1}</Page><Text>{cleaned_up_text}</Text></Chunk>')
+            if len(text_accumulator) > chunk_size:
+                chunk_accumulator.append(text_accumulator)
+                total_chunks+=1
+                text_accumulator = []
+            
+            if len(chunk_accumulator) == spooling_size:
+                overlap_and_upload_chunks(cosmos_container, chunk_accumulator, overlap_size, openai_client, True, total_chunks, total_chunks_uploaded, '')
+                total_chunks_uploaded+=(len(chunk_accumulator)-1)
+                chunk_accumulator = chunk_accumulator[(spooling_size-1):]
+    
+    if len(text_accumulator) != 0:
+        chunk_accumulator.append(text_accumulator)
+        total_chunks+=1
+        text_accumulator = []
+    
+    overlap_and_upload_chunks(cosmos_container, chunk_accumulator, overlap_size, openai_client, False, total_chunks, total_chunks_uploaded, '')
+
+    if get_config("CleanupTempData"):
+        run_directory_path.unlink() # delete run directory
+    
+    return (total_chunks, total_chunks_uploaded)
+
+def index_using_pdfplumber(document, chunk_size, spooling_size, cosmos_container, overlap_size, openai_client, total_chunks, total_chunks_uploaded):
+    chunk_accumulator = []
+    text_accumulator = []
+
+    with pdfplumber.open(document["Location"]) as pdf:
+        print(f"Found {len(pdf.pages)} pages to index")
+        for i, page in enumerate(pdf.pages):
+            print(f"Processing {i+1} page")
+
+            page_text = page.extract_text()
+            page.flush_cache()
+            
+            chunks = chunk_text(page_text, openai_client)
+            for text in chunks:
+                cleaned_up_text = text.strip()
+                # we don't want to index empty strings
+                if len(cleaned_up_text) == 0:
+                    continue
+
+                text_accumulator.append(f'<Chunk><DocumentName>{document["Name"]}</DocumentName><DocumentDescription>{document["Description"]}</DocumentDescription><Page>{i+1}</Page><Text>{cleaned_up_text}</Text></Chunk>')
+                if len(text_accumulator) > chunk_size:
+                    chunk_accumulator.append(text_accumulator)
+                    total_chunks+=1
+                    text_accumulator = []
+                
+                if len(chunk_accumulator) == spooling_size:
+                    overlap_and_upload_chunks(cosmos_container, chunk_accumulator, overlap_size, openai_client, True, total_chunks, total_chunks_uploaded, '')
+                    total_chunks_uploaded+=(len(chunk_accumulator)-1)
+                    chunk_accumulator = chunk_accumulator[(spooling_size-1):]
+        
+        if len(text_accumulator) != 0:
+            chunk_accumulator.append(text_accumulator)
+            total_chunks+=1
+            text_accumulator = []
+        
+        overlap_and_upload_chunks(cosmos_container, chunk_accumulator, overlap_size, openai_client, False, total_chunks, total_chunks_uploaded, '')
+
+    return (total_chunks, total_chunks_uploaded)
             
 def upload_final_ruling():
     print('Uploading Final Ruling')
@@ -112,46 +253,27 @@ def upload_final_ruling():
 
     documents = get_config("Documents")
 
-    print(f'Found {len(documents)} to index')
+    print(f'Found {len(documents)} document(s) to index')
 
-    chunk_accumulator = []
-    text_accumulator = []
-    total_chunks = 0
-    total_chunks_uploaded = 0
     spooling_size = get_config("SpoolingSize")
-    chunking_character = get_config("ChunkingCharacter")
 
-    for document in documents:        
-        with pdfplumber.open(document["Location"]) as pdf:
-            for i, page in enumerate(pdf.pages):
-                page_text = page.extract_text()
-                page.flush_cache()
-                # trying to get rid of the pesky extra info
-                normalized_page_text = strip_emails_and_phone_numbers_and_web_addresses(page_text)
-                normalized_page_text = normalize_text(normalized_page_text)
-                for text in normalized_page_text.split(chunking_character):
-                    cleaned_up_text = text.strip()
-                    # we don't want to index empty strings
-                    if len(cleaned_up_text) == 0:
-                        continue
+    partition_key = get_config("PartitionKey")
+    print(f"Targeting {partition_key} partition")
+    
+    total_chunks = 0
+    total_chunks_uploaded = get_config("StartingChunkCount") if get_config("StartingChunkCount") is not None else 0 
 
-                    text_accumulator.append(f'<Chunk><DocumentName>{document["Name"]}</DocumentName><DocumentDescription>{document["Description"]}</DocumentDescription><Page>{i+1}</Page><Text>{cleaned_up_text}</Text></Chunk>')
-                    if len(text_accumulator) > chunk_size:
-                        chunk_accumulator.append(text_accumulator)
-                        total_chunks+=1
-                        text_accumulator = []
-                    
-                    if len(chunk_accumulator) == spooling_size:
-                        overlap_and_upload_chunks(cosmos_container, chunk_accumulator, overlap_size, openai_client, True, total_chunks, total_chunks_uploaded, '')
-                        total_chunks_uploaded+=(len(chunk_accumulator)-1)
-                        chunk_accumulator = chunk_accumulator[(spooling_size-1):]
-            
-            if len(text_accumulator) != 0:
-                chunk_accumulator.append(text_accumulator)
-                total_chunks+=1
-                text_accumulator = []
-
-            overlap_and_upload_chunks(cosmos_container, chunk_accumulator, overlap_size, openai_client, False, total_chunks, total_chunks_uploaded, '')
+    for document in documents:   
+        print(f"Processing '{document['Name']}'")
+        if get_config("ConvertToImagesFirst"):
+            (final_total_chunks, final_total_chunks_uploaded) = index_using_pdf_to_image(document, chunk_size, spooling_size, cosmos_container, overlap_size, openai_client, total_chunks, total_chunks_uploaded)
+            total_chunks = final_total_chunks
+            total_chunks_uploaded = final_total_chunks_uploaded
+        else:
+            (final_total_chunks, final_total_chunks_uploaded) = index_using_pdfplumber(document, chunk_size, spooling_size, cosmos_container, overlap_size, openai_client, total_chunks, total_chunks_uploaded)
+            total_chunks = final_total_chunks
+            total_chunks_uploaded = final_total_chunks_uploaded
+        
 
 def overlap_and_upload_chunks(cosmos_container, chunk_accumulator, overlap_size, openai_client, ignore_last_index, total_chunks, total_already_uploaded, joining_character):
     overlapped_chunks = []
@@ -182,7 +304,11 @@ def overlap_and_upload_chunks(cosmos_container, chunk_accumulator, overlap_size,
                     new_chunk = new_chunk + chunk_accumulator[i + 1][:overlap_size]
 
                 overlapped_chunks.append(new_chunk)
+    elif len(chunk_accumulator) == 1:
+        # means there aren't enough chunks to overlap so just upload the one
+        overlapped_chunks.append(chunk_accumulator[0])
 
+    print(f"Overlapped chunks {len(overlapped_chunks)}")
     for i, chunks in enumerate(overlapped_chunks):
         chunked_data = joining_character.join(chunks)
 
