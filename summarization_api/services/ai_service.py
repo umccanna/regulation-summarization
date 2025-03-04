@@ -34,7 +34,7 @@ class AIService:
                     * When asked to provide page numbers look for the page number tag surrounding the text in the format of <Page {number}>{text}</Page {number}>
             '''
         
-        if regulation["partitionKey"] in ["PROF_2015_PROPOSED"]:
+        if regulation["partitionKey"] in ["PROF_2015_PROPOSED", "MSSP_2015_PROPOSED", "MSSP_2015_FINAL"]:
             return '''
                 You are a CMS Regulation Analyst that analyzes pricing regulations and provides concise and accurate summaries of the regulations.  
                     Adhere to these high level guides when responding: 
