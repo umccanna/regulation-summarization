@@ -2,12 +2,19 @@ import azure.functions as func
 import json
 from mangers.regulation_manager import RegulationManager
 from repositories.regulation_repository import RegulationRepository
+from mangers.token_manager import TokenManager
 
 
 app = func.FunctionApp()
 
 @app.route(route="summarize", auth_level=func.AuthLevel.ANONYMOUS, methods=["POST"])
 def SummarizationAPI(req: func.HttpRequest) -> func.HttpResponse:
+    token = parse_token(req)
+    if not token:
+        return func.HttpResponse(
+            status_code=401
+        )
+    
     req_body = req.get_json()
 
     regulation = req_body["regulation"]
@@ -56,8 +63,13 @@ def SummarizationAPI(req: func.HttpRequest) -> func.HttpResponse:
     
 @app.route(route="conversations/list", auth_level=func.AuthLevel.ANONYMOUS, methods=["POST"])
 def GetConversationListsAPI(req: func.HttpRequest) -> func.HttpResponse:
+    token = parse_token(req)
+    if not token:
+        return func.HttpResponse(
+            status_code=401
+        )
+    
     req_body = req.get_json()
-
     user_id = req_body["userId"]
     
     if not user_id:
@@ -77,6 +89,12 @@ def GetConversationListsAPI(req: func.HttpRequest) -> func.HttpResponse:
 
 @app.route(route="conversations/load", auth_level=func.AuthLevel.ANONYMOUS, methods=["POST"])
 def GetConversationAPI(req: func.HttpRequest) -> func.HttpResponse:
+    token = parse_token(req)
+    if not token:
+        return func.HttpResponse(
+            status_code=401
+        )
+    
     try:
         req_body = req.get_json()
         user_id = req_body.get("userId")
@@ -108,6 +126,12 @@ def GetConversationAPI(req: func.HttpRequest) -> func.HttpResponse:
     
 @app.route(route="regulations", auth_level=func.AuthLevel.ANONYMOUS, methods=["GET"])
 def GetSupportedRegulationsAPI(req: func.HttpRequest) -> func.HttpResponse:
+    token = parse_token(req)
+    if not token:
+        return func.HttpResponse(
+            status_code=401
+        )
+    
     manager = RegulationManager()
     regulations = manager.get_available_regulations()
     return func.HttpResponse(
@@ -115,3 +139,12 @@ def GetSupportedRegulationsAPI(req: func.HttpRequest) -> func.HttpResponse:
         status_code=200,
         mimetype="application/json"
     )
+
+def parse_token(req: func.HttpRequest):
+    token_manager = TokenManager()
+    auth_token = req.headers.get("Authorization")
+    if auth_token is None:
+        return None
+    
+    [_, token_value] = auth_token.split("Bearer ")
+    return token_manager.parse_token(token_value)

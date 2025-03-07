@@ -18,6 +18,8 @@ __configuration = {
         "COSMOS_DB_KEY": "",
         "DATABASE_NAME": "summarizations",
         "CONTAINER_NAME": "pricingregulations",
+        "Okta__Audience": "0oa1uj3zlj5hatOW91d8",
+        "Okta__Issuer": "https://milliman.okta.com",
         "ChunkSize": 20,
         "Overlap": 5,
         "ChunkingCharacter":".",
