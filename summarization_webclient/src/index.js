@@ -8,7 +8,7 @@ const authClient = new OktaAuth({
   // Required Fields for OIDC client
   url: baseOktaURL,
   clientId: appClientID,
-  redirectUri: "http://localhost:1234/login/callback",
+  redirectUri: `${process.env.SSO_REDIRECT_BASE_URL}/login/callback`,
   issuer: baseOktaURL, // oidc
   scopes: ['openid', 'profile', 'email']
 });
@@ -51,7 +51,7 @@ function logout() {
   if (!token) {
     window.location.href = "/signout/callback";
   } else {
-    window.location.href = `${baseOktaURL}/oauth2/v1/logout?id_token_hint=${token.idToken}&post_logout_redirect_uri=${encodeURI("http://localhost:1234/signout/callback")}`
+    window.location.href = `${baseOktaURL}/oauth2/v1/logout?id_token_hint=${token.idToken}&post_logout_redirect_uri=${encodeURI(`${process.env.SSO_REDIRECT_BASE_URL}/signout/callback`)}`
   }
 }
 
@@ -88,8 +88,7 @@ async function fetchConversationHistory() {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token.idToken}`
-      },
-      body: JSON.stringify({ userId })
+      }
     });
     if (!response.ok) throw new Error('Failed to load conversations');
 
@@ -173,7 +172,7 @@ const signoutButton = document.getElementById('signout-button');
 const signinButton = document.getElementById('login-button');
 
 let currentConversationId = null;
-const userId = getOrCreateUserId();
+const userId = getUserId();
 
 marked.setOptions({
   breaks: true,
@@ -196,7 +195,7 @@ function addMessage(content, isUser = false, isInContext = true) {
     messageDiv.textContent = content;
   } else {
     // Ensure numbered lists are displayed properly
-    const processedContent = content.replace(/^\d+\./gm, '\n$&');
+    const processedContent = content?.replace(/^\d+\./gm, '\n$&') || '';
     const htmlContent = marked.parse(processedContent);
     const sanitizedHtml = DOMPurify.sanitize(htmlContent);
     messageDiv.innerHTML = sanitizedHtml;
@@ -219,14 +218,12 @@ function removeTypingIndicator(indicator) {
   }
 }
 
-function getOrCreateUserId() {
-  const existingUserId = localStorage.getItem("userId");
-  if (existingUserId) {
-    return existingUserId;
-  }
-  const generatedUserId = crypto.randomUUID();
-  localStorage.setItem("userId", generatedUserId);
-  return generatedUserId;
+function getUserId() {
+  return localStorage.getItem("userId");
+}
+
+function removeUserId() {
+  localStorage.removeItem("userId");
 }
 
 function clearChatWindow() {
@@ -272,7 +269,6 @@ async function sendMessage(message) {
         'Authorization': `Bearer ${token.idToken}`
       },
       body: JSON.stringify({
-        userId,
         conversationId: currentConversationId,
         query: message,
         regulation: selectedRegulation.partitionKey
@@ -326,7 +322,7 @@ async function loadConversation(conversationId) {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token.idToken}`
       },
-      body: JSON.stringify({ conversationId, userId })
+      body: JSON.stringify({ conversationId })
     });
 
     if (!response.ok) {
@@ -582,6 +578,24 @@ function setWelcomeText(idToken) {
   document.getElementById("welcome-container").appendChild(welcome)
 }
 
+async function migrateConversationsIfNeeded() {
+  if (userId) {
+    const token = getToken();
+    const response = await fetch(`${process.env.API_BASE_URL}/conversations/migrate`, {
+      method: 'POST',
+      body: JSON.stringify({ userId }),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token.idToken}`
+      }
+    });
+
+    if (response.ok) {
+      removeUserId();
+    }
+  }
+}
+
 async function init() {
   // we only want to initialize if we aren't on a callback URL
   if (window.location.pathname === "/login/callback" ||
@@ -589,13 +603,15 @@ async function init() {
   ) {
     return;
   }
-  
+
   const idToken = getToken();
   const initialLogin = document.getElementById("initial-login");
   if (!idToken) {
     initialLogin.style.display = "inherit";
     return;
   }
+
+  await migrateConversationsIfNeeded();
 
   setWelcomeText(idToken);
 
@@ -628,7 +644,8 @@ signinButton.addEventListener('click', login);
 signoutButton.addEventListener('click', logout);
 
 // On DOM load, fetch conversation list & init chat
-document.addEventListener('DOMContentLoaded', () => {
-  fetchConversationHistory();
-  init();
+document.addEventListener('DOMContentLoaded', () => {  
+  init().then(() => {
+    fetchConversationHistory();
+  });
 });

@@ -18,8 +18,8 @@ def SummarizationAPI(req: func.HttpRequest) -> func.HttpResponse:
     req_body = req.get_json()
 
     regulation = req_body["regulation"]
-    query = req_body["query"]
-    user_id = req_body["userId"]
+    query = req_body["query"]    
+    user_id = token["sub"] # sub equates to the Okta user id
     conversation_id = req_body["conversationId"] if "conversationId" in req_body else None
 
     if not regulation:
@@ -31,12 +31,6 @@ def SummarizationAPI(req: func.HttpRequest) -> func.HttpResponse:
     if not query:
         return func.HttpResponse(
             "Query is required",
-            status_code=400
-        )
-    
-    if not user_id:
-        return func.HttpResponse(
-            "User Id is required",
             status_code=400
         )
     
@@ -61,6 +55,37 @@ def SummarizationAPI(req: func.HttpRequest) -> func.HttpResponse:
             status_code=500
         )
     
+@app.route(route="conversations/migrate", auth_level=func.AuthLevel.ANONYMOUS, methods=["POST"])
+def MigrateConversationsAPI(req: func.HttpRequest) -> func.HttpResponse:
+    token = parse_token(req)
+    if not token:
+        return func.HttpResponse(
+            status_code=401
+        )
+    
+    new_user_id = token["sub"]
+    req_body = req.get_json()
+
+    old_user_id = req_body["userId"]
+    if not old_user_id:
+        return func.HttpResponse(
+            "User Id is required",
+            status_code=400
+        )
+    
+    manager = RegulationManager()
+    success = manager.migrate_conversations(old_user_id, new_user_id)
+
+    if success:
+        return func.HttpResponse(
+            status_code=200
+        )
+
+    return func.HttpResponse(
+        status_code=500
+    )
+
+    
 @app.route(route="conversations/list", auth_level=func.AuthLevel.ANONYMOUS, methods=["POST"])
 def GetConversationListsAPI(req: func.HttpRequest) -> func.HttpResponse:
     token = parse_token(req)
@@ -69,8 +94,7 @@ def GetConversationListsAPI(req: func.HttpRequest) -> func.HttpResponse:
             status_code=401
         )
     
-    req_body = req.get_json()
-    user_id = req_body["userId"]
+    user_id = token["sub"] # sub equates to the Okta user id
     
     if not user_id:
         return func.HttpResponse(
@@ -97,11 +121,8 @@ def GetConversationAPI(req: func.HttpRequest) -> func.HttpResponse:
     
     try:
         req_body = req.get_json()
-        user_id = req_body.get("userId")
+        user_id = token["sub"] # sub equates to the Okta user id
         conversation_id = req_body.get("conversationId")
-
-        if not user_id:
-            return func.HttpResponse("User Id is required", status_code=400)
 
         if not conversation_id:
             return func.HttpResponse("Conversation Id is required", status_code=400)
