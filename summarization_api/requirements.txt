@@ -6,3 +6,6 @@ azure-functions
 openai
 python-dotenv
 azure-cosmos
+requests
+cryptography
+PyJWT

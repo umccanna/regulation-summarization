@@ -15,6 +15,9 @@ class RegulationManager:
             
         return None
     
+    def migrate_conversations(self, old_user_id, new_user_id):
+        return self.__regulation_repository.migrate_conversations(old_user_id, new_user_id)
+    
     def get_available_regulations(self):
         return self.__regulation_repository.get_available_regulations()
     

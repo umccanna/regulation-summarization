@@ -8,17 +8,18 @@ __configuration = {
     "Default": {
         "Documents":[
             {
-                "Location": "P:\\HIM-PHI\\52 Fee Schedule\\2025\\AHEAD\\Data\\States\\Rhode Island\\RI AHEAD State Agreement 1.16.2025 RI signed_CMS signed Fully Executed.pdf",
-                "Name": "RI AHEAD State Agreement 1.16.2025 RI signed_CMS signed Fully Executed",
-                "Description": "Rhode Island AHEAD State Agreement"
+                "Location": "T:\\Data\\CMS\\Fee Schedules\\GenAI Summarization\\Analysis\\TextExractAndVectorization\\0_Final Ruling\\CY2025 OPPS Final Rule.pdf",
+                "Name": "CY2024 OPPS Final Rule",
+                "Description": "OPPS 2024 Final Rule"
             }
         ],
+        "FactSheetLocation": "T:\\Data\\CMS\\Fee Schedules\\GenAI Summarization\\Analysis\\TextExractAndVectorization\\0_Final Ruling\\CY2025 OPPS Final Rule Fact Sheet.pdf",
         "ConvertToImagesFirst": True,
         "TempImageLocation": "C:\\src\\data\\extracted_images",
         "CleanupTempData": False,
-        "StartingChunkCount": 289,
+        "StartingChunkCount": 0,
         "UseAIChunking": True,
-        "PartitionKey": "AHEAD_NOFO_ALL_STATE_NARRATIVES",
+        "PartitionKey": "OPPS_2025_FINAL_V2",
         "AZURE_OPENAI_ENDPOINT": "https://seattlehealth-openai.openai.azure.com/",
         "AZURE_OPENAI_API_KEY": "",
         "EmbeddingsModel": "seattlehealth-embeddings-small",

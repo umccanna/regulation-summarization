@@ -2,17 +2,24 @@ import azure.functions as func
 import json
 from mangers.regulation_manager import RegulationManager
 from repositories.regulation_repository import RegulationRepository
+from mangers.token_manager import TokenManager
 
 
 app = func.FunctionApp()
 
 @app.route(route="summarize", auth_level=func.AuthLevel.ANONYMOUS, methods=["POST"])
 def SummarizationAPI(req: func.HttpRequest) -> func.HttpResponse:
+    token = parse_token(req)
+    if not token:
+        return func.HttpResponse(
+            status_code=401
+        )
+    
     req_body = req.get_json()
 
     regulation = req_body["regulation"]
-    query = req_body["query"]
-    user_id = req_body["userId"]
+    query = req_body["query"]    
+    user_id = token["sub"] # sub equates to the Okta user id
     conversation_id = req_body["conversationId"] if "conversationId" in req_body else None
 
     if not regulation:
@@ -24,12 +31,6 @@ def SummarizationAPI(req: func.HttpRequest) -> func.HttpResponse:
     if not query:
         return func.HttpResponse(
             "Query is required",
-            status_code=400
-        )
-    
-    if not user_id:
-        return func.HttpResponse(
-            "User Id is required",
             status_code=400
         )
     
@@ -54,11 +55,46 @@ def SummarizationAPI(req: func.HttpRequest) -> func.HttpResponse:
             status_code=500
         )
     
-@app.route(route="conversations/list", auth_level=func.AuthLevel.ANONYMOUS, methods=["POST"])
-def GetConversationListsAPI(req: func.HttpRequest) -> func.HttpResponse:
+@app.route(route="conversations/migrate", auth_level=func.AuthLevel.ANONYMOUS, methods=["POST"])
+def MigrateConversationsAPI(req: func.HttpRequest) -> func.HttpResponse:
+    token = parse_token(req)
+    if not token:
+        return func.HttpResponse(
+            status_code=401
+        )
+    
+    new_user_id = token["sub"]
     req_body = req.get_json()
 
-    user_id = req_body["userId"]
+    old_user_id = req_body["userId"]
+    if not old_user_id:
+        return func.HttpResponse(
+            "User Id is required",
+            status_code=400
+        )
+    
+    manager = RegulationManager()
+    success = manager.migrate_conversations(old_user_id, new_user_id)
+
+    if success:
+        return func.HttpResponse(
+            status_code=200
+        )
+
+    return func.HttpResponse(
+        status_code=500
+    )
+
+    
+@app.route(route="conversations/list", auth_level=func.AuthLevel.ANONYMOUS, methods=["POST"])
+def GetConversationListsAPI(req: func.HttpRequest) -> func.HttpResponse:
+    token = parse_token(req)
+    if not token:
+        return func.HttpResponse(
+            status_code=401
+        )
+    
+    user_id = token["sub"] # sub equates to the Okta user id
     
     if not user_id:
         return func.HttpResponse(
@@ -77,13 +113,16 @@ def GetConversationListsAPI(req: func.HttpRequest) -> func.HttpResponse:
 
 @app.route(route="conversations/load", auth_level=func.AuthLevel.ANONYMOUS, methods=["POST"])
 def GetConversationAPI(req: func.HttpRequest) -> func.HttpResponse:
+    token = parse_token(req)
+    if not token:
+        return func.HttpResponse(
+            status_code=401
+        )
+    
     try:
         req_body = req.get_json()
-        user_id = req_body.get("userId")
+        user_id = token["sub"] # sub equates to the Okta user id
         conversation_id = req_body.get("conversationId")
-
-        if not user_id:
-            return func.HttpResponse("User Id is required", status_code=400)
 
         if not conversation_id:
             return func.HttpResponse("Conversation Id is required", status_code=400)
@@ -108,6 +147,12 @@ def GetConversationAPI(req: func.HttpRequest) -> func.HttpResponse:
     
 @app.route(route="regulations", auth_level=func.AuthLevel.ANONYMOUS, methods=["GET"])
 def GetSupportedRegulationsAPI(req: func.HttpRequest) -> func.HttpResponse:
+    token = parse_token(req)
+    if not token:
+        return func.HttpResponse(
+            status_code=401
+        )
+    
     manager = RegulationManager()
     regulations = manager.get_available_regulations()
     return func.HttpResponse(
@@ -115,3 +160,12 @@ def GetSupportedRegulationsAPI(req: func.HttpRequest) -> func.HttpResponse:
         status_code=200,
         mimetype="application/json"
     )
+
+def parse_token(req: func.HttpRequest):
+    token_manager = TokenManager()
+    auth_token = req.headers.get("Authorization")
+    if auth_token is None:
+        return None
+    
+    [_, token_value] = auth_token.split("Bearer ")
+    return token_manager.parse_token(token_value)

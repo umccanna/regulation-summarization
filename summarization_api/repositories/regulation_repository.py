@@ -4,6 +4,7 @@ from azure.cosmos import CosmosClient
 import uuid
 from datetime import timezone 
 import datetime 
+from azure.cosmos.exceptions import CosmosResourceExistsError
 
 class RegulationRepository:
     def __init__(self):
@@ -112,6 +113,57 @@ class RegulationRepository:
         container.create_item(new_conversation)
 
         return self.__convert_from_cosmos_conversation(new_conversation)
+    
+    def migrate_conversations(self, old_user_id, new_user_id):
+        logging.info(f'Migrating conversations from {old_user_id} to {new_user_id}')
+
+        container = self.__database.get_container_client("conversations")
+        
+        success = True
+        for item in container.query_items(
+            query = """
+                SELECT *
+                FROM c 
+            """,
+            partition_key=old_user_id
+        ):
+            try:
+                if item["type"] == "Conversation":
+                        container.create_item({
+                            "id": item["id"],
+                            "partitionKey": new_user_id,
+                            "conversationName": item["conversationName"],
+                            "regulationPartitionKey": item["regulationPartitionKey"],
+                            "userId": new_user_id,
+                            "type": "Conversation",
+                            "created": item["created"],
+                            "sequenceCount": item["sequenceCount"],
+                            "updated": item["updated"]
+                        })
+
+                elif item["type"] == "ConversationLog":
+                        container.create_item({
+                            "id": item["id"],
+                            "conversationId": item["conversationId"],
+                            "partitionKey": new_user_id,
+                            "promptRaw": item["promptRaw"] if "promptRaw" in item else None,
+                            "promptImproved": item["promptImproved"] if "promptImproved" in item else None,
+                            "contextRaw": item["contextRaw"],
+                            "contextSummarized": item["contextSummarized"],
+                            "factSheet": item["factSheet"],
+                            "sequence": item["sequence"],
+                            "directions": item["directions"] if "directions" in item else None,
+                            "response": item["response"] if "response" in item else None,
+                            "type": "ConversationLog",
+                            "created": item["created"]
+                        })
+                else:
+                    success = False
+                    logging.warning(f"Conversation item skipped because type is unknown. Id: {item['id']}, Type: {item['type']}, partitionKey: {item['partitionKey']}")            
+            except CosmosResourceExistsError:
+                logging.warning(f"Item already exists in partition, ignoring.  Possibly from a previous migration. Id: {item['id']}, Type: {item['type']}, partitionKey: {item['partitionKey']}")
+
+        return success
     
     def get_conversation(self, user_id: str, conversation_id: str):
         if not conversation_id:
