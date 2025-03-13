@@ -67,7 +67,7 @@ class AIService:
                 * When asked to provide page numbers look for the page number tag surrounding the text in the format of <Page {number}>{text}</Page {number}>
             '''
         
-        if regulation["partitionKey"] in ["AHEAD_NOFO_ALL_STATE_NARRATIVES", "AHEAD_NOFO_HAWAII_NARRATIVE", "AHEAD_NOFO_VERMONT_NARRATIVE", "AHEAD_NOFO_CONNECTICUT_NARRATIVE", "AHEAD_NOFO_MARYLAND_NARRATIVE", "AHEAD_NOFO_NEW_YORK_NARRATIVE", "AHEAD_NOFO_RHODE_ISLAND_NARRATIVE"]:
+        if regulation["partitionKey"] in ["AHEAD_NOFO_ALL_STATE_NARRATIVES", "AHEAD_NOFO_HAWAII_NARRATIVE", "AHEAD_NOFO_VERMONT_NARRATIVE", "AHEAD_NOFO_CONNECTICUT_NARRATIVE", "AHEAD_NOFO_MARYLAND_NARRATIVE", "AHEAD_NOFO_NEW_YORK_NARRATIVE", "AHEAD_NOFO_RHODE_ISLAND_NARRATIVE", "AHEAD_NOFO_2023_W_FIN_SPECS"]:
             return '''
                 You are an Analyst that analyzes documents and provides concise and accurate summaries of the documents. 
                 Adhere to these high level guides when responding: 
