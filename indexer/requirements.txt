@@ -5,3 +5,7 @@ azure-cosmos
 pillow
 pdf2image
 pytesseract
+pandas
+numpy
+opencv-python
+tabulate

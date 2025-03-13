@@ -8,10 +8,16 @@ __configuration = {
     "Default": {
         "Documents":[
             {
-                "Location": "T:\\Data\\CMS\\Fee Schedules\\GenAI Summarization\\Analysis\\TextExractAndVectorization\\0_Final Ruling\\CY2025 OPPS Final Rule.pdf",
-                "Name": "CY2024 OPPS Final Rule",
-                "Description": "OPPS 2024 Final Rule"
+                "Location": "P:\\HIM-PHI\\52 Fee Schedule\\2025\\AHEAD\\Data\\CMS\\AHEAD-FinancialSpecsFFSHGBM_7_22_24.pdf",
+                "Name": "AHEAD-FinancialSpecsFFSHGBM_7_22_24",
+                "Description": "AHEAD Financial Specifications for the CMS-Designed Medicare FFS Hospital Global Budget Methodology"
             }
+            #,
+            # {
+            #     "Location": "P:\\HIM-PHI\\52 Fee Schedule\\2025\\AHEAD\\Data\\CMS\\AHEAD NOFO Final 11.15.2023 508.pdf",
+            #     "Name": "AHEAD NOFO Final 11.15.2023 508",
+            #     "Description": "AHEAD NOFO Final 2023"
+            # } 
         ],
         "FactSheetLocation": "T:\\Data\\CMS\\Fee Schedules\\GenAI Summarization\\Analysis\\TextExractAndVectorization\\0_Final Ruling\\CY2025 OPPS Final Rule Fact Sheet.pdf",
         "ConvertToImagesFirst": True,
@@ -19,7 +25,8 @@ __configuration = {
         "CleanupTempData": False,
         "StartingChunkCount": 0,
         "UseAIChunking": True,
-        "PartitionKey": "OPPS_2025_FINAL_V2",
+        "RemoveNewlinesDuringNormalization": False,
+        "PartitionKey": "AHEAD_2023_FIN_SPECS",
         "AZURE_OPENAI_ENDPOINT": "https://seattlehealth-openai.openai.azure.com/",
         "AZURE_OPENAI_API_KEY": "",
         "EmbeddingsModel": "seattlehealth-embeddings-small",

@@ -12,15 +12,20 @@ from io import BytesIO
 from pdf2image import convert_from_path
 import uuid
 import pytesseract
+import cv2
+import numpy as np
+import pandas as pd
+from typing import List, Tuple
 
 def normalize_text(text: str):
-    text = re.sub(r'\s+',  ' ', text).strip()
+    text = re.sub(r' {2,}',  ' ', text).strip()
     text = re.sub(r". ,","",text)
     # remove all instances of multiple spaces
     text = text.replace("..",".")
     text = text.replace(". .",".")
-    text = text.replace("\n", "")
-    text = text.replace("\r", "")
+    if get_config("RemoveNewlinesDuringNormalization"):
+        text = text.replace("\n", "")
+        text = text.replace("\r", "")
 
     # replace unicode characters with more usable characters 
     text = text.replace("●", "*")
@@ -130,6 +135,115 @@ def chunk_text(text, openai_client):
     normalized_page_text = normalize_text(text)
     return normalized_page_text.split(get_config("ChunkingCharacter"))
 
+def attempt_to_extract_tables(image):
+    def preprocess_image(image: np.ndarray) -> np.ndarray:
+        """
+        Preprocess the image to improve OCR accuracy.
+        """
+        # Convert to grayscale
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+        # Apply thresholding to preprocess the image
+        thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY
+            | cv2.THRESH_OTSU)[1]
+
+        # Apply dilation to merge letters
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2,2))
+        dilate = cv2.dilate(thresh, kernel, iterations=1)
+
+        return dilate
+
+    def detect_table_borders(
+        preprocessed_image: np.ndarray) -> Tuple[List[int], List[int]]:
+        """
+        Detect table borders using image processing techniques.
+        """
+        # Find all contours
+        contours, _ = cv2.findContours(preprocessed_image,
+            cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+        # Sort contours by area, descending
+        contours = sorted(contours, key=cv2.contourArea, reverse=True)
+
+        # Find the contour with 4 corners (assuming it's the table)
+        for c in contours:
+            peri = cv2.arcLength(c, True)
+            approx = cv2.approxPolyDP(c, 0.02 * peri, True)
+
+            if len(approx) == 4:
+                # These are our table boundaries
+                return approx.reshape(4, 2)
+
+        return None
+
+    def extract_table_structure(image: np.ndarray,
+        table_coords: List[Tuple[int, int]]) -> pd.DataFrame:
+        """
+        Extract table structure using the detected table coordinates.
+        """
+        # Crop the table from the image
+        x, y, w, h = cv2.boundingRect(np.array(table_coords))
+        cropped = image[y:y+h, x:x+w]
+
+        # Use Tesseract to do OCR on the cropped image
+        ocr_result = pytesseract.image_to_data(cropped,
+            output_type=pytesseract.Output.DATAFRAME)
+
+        # Filter out empty text
+        ocr_result = ocr_result[ocr_result.text.notna()]
+
+        # Group by lines
+        lines = ocr_result.groupby('block_num')
+
+        # Extract text and positions
+        table_data = []
+        for _, line in lines:
+            line_text = ' '.join(line['text'].tolist())
+            left = line['left'].min()
+            top = line['top'].min()
+            table_data.append((line_text, left, top))
+
+        # Sort by vertical position (top)
+        table_data.sort(key=lambda x: x[2])
+
+        # Create DataFrame
+        df = pd.DataFrame(table_data, columns=['text', 'left', 'top'])
+
+        # Identify columns based on 'left' position
+        df['column'] = pd.cut(df['left'], bins=5, labels=False)
+
+        # Pivot to create final table structure
+        final_table = df.pivot(columns='column',
+            values='text').reset_index(drop=True)
+
+        return final_table
+    
+    np_image = np.array(image)
+
+    # Preprocess the image
+    preprocessed = preprocess_image(np_image)
+
+    # Detect table borders
+    table_coords = detect_table_borders(preprocessed)
+
+    extracted_tables = []
+    if table_coords is not None:
+        # Extract table structure
+        table = extract_table_structure(np_image, table_coords)
+        extracted_tables.append(table.to_markdown(index=False))
+
+    return extracted_tables
+
+def adjust_image_for_ocr(image):
+    np_image = np.array(image)
+    # Convert to grayscale
+    gray = cv2.cvtColor(np_image, cv2.COLOR_BGR2GRAY)
+    
+    thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY
+        | cv2.THRESH_OTSU)[1]
+
+
+    return thresh
 
 def index_using_pdf_to_image(document, chunk_size, spooling_size, cosmos_container, overlap_size, openai_client, total_chunks, total_chunks_uploaded):    
     chunk_accumulator = []
@@ -145,8 +259,13 @@ def index_using_pdf_to_image(document, chunk_size, spooling_size, cosmos_contain
     print(f"Created {len(images)} image pages")
     for i, page_image in enumerate(images):
         print(f"Processing page {i+1}")
+
+
         page_image.save(run_directory_path.joinpath(f"page_{i+1}.png"), "PNG")
-        text = pytesseract.image_to_string(page_image)
+        adjusted_image = adjust_image_for_ocr(page_image)
+        im = Image.fromarray(adjusted_image)
+        im.save(run_directory_path.joinpath(f"page_{i+1}_adjusted.png"))
+        text = pytesseract.image_to_string(adjusted_image)
         with open(run_directory_path.joinpath(f"page_text_raw_{i+1}.txt"), "w") as w:
             w.write(text) 
 
