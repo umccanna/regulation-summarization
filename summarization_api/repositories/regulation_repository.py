@@ -207,7 +207,7 @@ class RegulationRepository:
         container = self.__database.get_container_client("conversations")
         conversations = []
         for item in container.query_items(
-            query="SELECT TOP 20 * FROM c WHERE c.type = 'Conversation' AND (c.deleted = false OR NOT IS_DEFINED(c.deleted)) ORDER BY c.created ASC",
+            query="SELECT TOP 20 * FROM c WHERE c.type = 'Conversation' AND (c.deleted = false OR NOT IS_DEFINED(c.deleted)) ORDER BY c.created DESC",
             parameters=[],
             partition_key=user_id
         ):
