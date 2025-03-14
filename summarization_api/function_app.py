@@ -1,7 +1,7 @@
 import azure.functions as func
 import json
 from mangers.regulation_manager import RegulationManager
-from repositories.regulation_repository import RegulationRepository
+from repositories.conversation_repository import ConversationRepository
 from mangers.token_manager import TokenManager
 
 
@@ -127,7 +127,7 @@ def GetConversationAPI(req: func.HttpRequest) -> func.HttpResponse:
         if not conversation_id:
             return func.HttpResponse("Conversation Id is required", status_code=400)
 
-        repository = RegulationRepository()
+        repository = ConversationRepository()
         conversation = repository.get_conversation(user_id, conversation_id)
 
         if conversation is None:

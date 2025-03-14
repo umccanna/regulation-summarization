@@ -5,6 +5,7 @@ import logging
 class RegulationManager:
     def __init__(self):
         self.__regulation_repository = RegulationRepository()
+        self.__conversation_repository = RegulationRepository()
         self.__ai_service = AIService()
 
     def __get_matching_regulation(self, regulation_id: str):
@@ -16,13 +17,13 @@ class RegulationManager:
         return None
     
     def migrate_conversations(self, old_user_id, new_user_id):
-        return self.__regulation_repository.migrate_conversations(old_user_id, new_user_id)
+        return self.__conversation_repository.migrate_conversations(old_user_id, new_user_id)
     
     def get_available_regulations(self):
         return self.__regulation_repository.get_available_regulations()
     
     def get_conversations(self, user_id):
-        return self.__regulation_repository.get_conversations(user_id)
+        return self.__conversation_repository.get_conversations(user_id)
 
     def __convert_conversation_history_to_ai_format(self, conversation_log: list, use_raw_prompt: bool):
         converted_history = []
@@ -99,10 +100,10 @@ class RegulationManager:
         try:
             selected_regulation = self.__get_matching_regulation(request["regulation"])
 
-            conversation = self.__regulation_repository.get_conversation(request["userId"], request["conversationId"]) if request["conversationId"] else None
+            conversation = self.__conversation_repository.get_conversation(request["userId"], request["conversationId"]) if request["conversationId"] else None
             if not conversation:
                 summarized_query = self.__ai_service.generate_title(request["query"], 30)
-                conversation = self.__regulation_repository.create_conversation(request["userId"], summarized_query, request["regulation"])
+                conversation = self.__conversation_repository.create_conversation(request["userId"], summarized_query, request["regulation"])
 
             # Limit messages sent to OpenAI (e.g., last 5)
             CONTEXT_LIMIT = 7
@@ -179,7 +180,7 @@ class RegulationManager:
             #         improved_user_query
             #     )
 
-            self.__regulation_repository.save_conversation_log({
+            self.__conversation_repository.save_conversation_log({
                 "conversationId": conversation["id"],
                 "userId": request["userId"],
                 "promptRaw": user_query,
