@@ -1,11 +1,12 @@
 from repositories.regulation_repository import RegulationRepository
+from repositories.conversation_repository import ConversationRepository
 from services.ai_service import AIService
 import logging
 
 class RegulationManager:
     def __init__(self):
         self.__regulation_repository = RegulationRepository()
-        self.__conversation_repository = RegulationRepository()
+        self.__conversation_repository = ConversationRepository()
         self.__ai_service = AIService()
 
     def __get_matching_regulation(self, regulation_id: str):

@@ -455,17 +455,153 @@ async function loadRegulations() {
   }
 }
 
+function findRegulationGroup(groupedRegulations, groupName){
+  let matchingGroup = null;
+
+  for (const group of groupedRegulations) {
+    if (group.type !== 'group') {
+      continue;
+    } 
+
+    if (group.name === groupName) {
+      return group;
+    }
+
+    return findRegulationGroup(group, leafName);
+  }
+
+  return matchingGroup;
+}
+
+function getOrCreateGroupedRegulationNode(groupedRegulations, hierarchy, currentLevel) {
+  if (currentLevel === undefined) {
+    currentLevel = 0;
+  }
+
+  for (const group of groupedRegulations.children) {
+    if (hierarchy[currentLevel] === group.name) {
+      if (currentLevel === hierarchy.length - 1) {
+        return group;
+      }
+
+      return getOrCreateGroupedRegulationNode(group, hierarchy, currentLevel+1);
+    }
+  }
+
+  const node = {
+    type: 'group',
+    name: hierarchy[currentLevel],
+    children: []
+  };
+
+  groupedRegulations.children.push(node);
+
+  if (currentLevel === hierarchy.length - 1) {
+    return node;
+  }
+
+  return getOrCreateGroupedRegulationNode(node, hierarchy, currentLevel+1);
+}
+
+function groupRegulations(regulations) {
+  const groupedRegulations = {
+    type: 'group',
+    name: '<root>',
+    children: []
+  };
+
+  for (const regulation of regulations) {  
+    if (!regulation.hierarchies || regulation.hierarchies.length === 0) {
+      const rootNode = getOrCreateGroupedRegulationNode(groupedRegulations, ['<root>']);
+      rootNode.children.push({
+        type: 'regulation',
+        name: regulation.title,
+        content: regulation
+      });
+    } else {
+      for (const hierarchy of regulation.hierarchies) {
+          const node = getOrCreateGroupedRegulationNode(groupedRegulations, hierarchy.split('/'));
+          node.children.push({
+            type: 'regulation',
+            name: regulation.title,
+            content: regulation
+          });
+      }
+    }
+  }  
+
+  return groupedRegulations;
+}
+
+
+const upChevronIcon = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
+<path stroke-linecap="round" stroke-linejoin="round" d="m4.5 15.75 7.5-7.5 7.5 7.5" />
+</svg>
+`;
+
+const downChevronIcon = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
+<path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+</svg>`
+
+function setupCollapsibleButtons(groupings, parentNode) {
+  for (const group of groupings) {
+    const uuid = crypto.randomUUID();
+    if (group.type === 'regulation') {      
+      const button = document.createElement('button');
+      button.className = 'w-full p-2 text-left hover:bg-gray-100 rounded';
+      button.textContent = group.name;
+      button.onclick = () => handleOnModalSelectedRegulation(group.content);
+      parentNode.appendChild(button);
+    } else if (group.type === 'group') {
+      const section = document.createElement('div');
+      section.id = `section-container-${uuid}`;
+      section.className = "collapsible-section";
+
+      parentNode.appendChild(section);      
+  
+      const sectionBody = document.createElement('div');
+      sectionBody.id = `section-body-${uuid}`;
+      sectionBody.className = "collapsible-section-body";
+      sectionBody.style.display = 'none';
+    
+      const sectionHeader = document.createElement('div');
+      sectionHeader.id = `section-header-${uuid}`;
+      sectionHeader.className = "collapsible-section-header";
+
+      sectionHeader.innerHTML = `<span>${downChevronIcon}</span><span>${group.name}</span>`;
+      sectionHeader.onclick = () => {
+        if (sectionBody.style.display === 'none') {
+          sectionBody.style.display = 'block';
+          sectionHeader.innerHTML = `<span>${upChevronIcon}</span><span>${group.name}</span>`;
+        } else {
+          sectionBody.style.display = 'none';
+          sectionHeader.innerHTML = `<span>${downChevronIcon}</span><span>${group.name}</span>`;
+        }
+      };
+
+      section.appendChild(sectionHeader);
+      section.appendChild(sectionBody);
+        
+      setupCollapsibleButtons(group.children, sectionBody)
+    }
+  }  
+}
+
 function displayRegulationsList(regulations) {
+  const groupings = groupRegulations(regulations);
+  console.log('groupings', groupings);
   const container = document.getElementById('regulation-list');
   container.innerHTML = '';
 
-  regulations.forEach(reg => {
-    const button = document.createElement('button');
-    button.className = 'w-full p-2 text-left hover:bg-gray-100 rounded';
-    button.textContent = reg.title;
-    button.onclick = () => handleOnModalSelectedRegulation(reg);
-    container.appendChild(button);
-  });
+  setupCollapsibleButtons(groupings.children, container);
+
+  // regulations.forEach(reg => {
+  //   const button = document.createElement('button');
+  //   button.className = 'w-full p-2 text-left hover:bg-gray-100 rounded';
+  //   button.textContent = reg.title;
+  //   button.onclick = () => handleOnModalSelectedRegulation(reg);
+  //   container.appendChild(button);
+  // });
 }
 
 function setSelectedRegulation(regulation) {
