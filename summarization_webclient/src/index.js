@@ -17,7 +17,6 @@ if (window.location.pathname === '/login/callback') {
   if (authClient.isLoginRedirect()) {
     authClient.token.parseFromUrl()
       .then(data => {
-        console.log('Tokens:', data.tokens);
         const { idToken } = data.tokens;
         sessionStorage.setItem('ID_TOKEN', JSON.stringify(idToken));
         window.location.replace("/");
@@ -254,8 +253,6 @@ async function sendMessage(message) {
   const typingIndicator = showTypingIndicator();
   const selectedRegulation = getSelectedRegulation();
 
-  console.log("Sending message with selected regulation:", selectedRegulation);
-
   try {
     const token = getToken();
     if (!token) {
@@ -308,8 +305,6 @@ async function sendMessage(message) {
 /* -------------------------------------------------------------------------- */
 async function loadConversation(conversationId) {
   try {
-    console.log(`Fetching conversation for conversationId: ${conversationId}`);
-
     const token = getToken();
     if (!token) {
       return;
@@ -330,10 +325,6 @@ async function loadConversation(conversationId) {
     }
 
     const messages = await response.json();
-    console.log('Retrieved conversation:', messages);
-
-    // Fetch regulations only once
-    console.log('Fetching regulations...');
 
     const regulationsResponse = await fetch(`${process.env.API_BASE_URL}/regulations`, {
       method: 'GET',
@@ -348,7 +339,6 @@ async function loadConversation(conversationId) {
     }
 
     const regulations = await regulationsResponse.json();
-    console.log('Retrieved regulations:', regulations);
 
     // Validate the conversation’s regulation
     const selectedRegulation = regulations.find(reg => reg.partitionKey === messages.regulation);
@@ -367,8 +357,6 @@ async function loadConversation(conversationId) {
       chatMessages.appendChild(errorDiv);
       return; // Stop further execution
     }
-
-    console.log(`Valid regulation found: ${selectedRegulation.title} (${selectedRegulation.partitionKey})`);
 
     // Update the UI with the correct regulation
     setSelectedRegulation(selectedRegulation);
@@ -455,17 +443,137 @@ async function loadRegulations() {
   }
 }
 
+function getOrCreateGroupedRegulationNode(groupedRegulations, hierarchy, currentLevel) {
+  if (currentLevel === undefined) {
+    currentLevel = 0;
+  }
+
+  for (const group of groupedRegulations.children) {
+    if (hierarchy[currentLevel] === group.name) {
+      if (currentLevel === hierarchy.length - 1) {
+        return group;
+      }
+
+      return getOrCreateGroupedRegulationNode(group, hierarchy, currentLevel+1);
+    }
+  }
+
+  const node = {
+    type: 'group',
+    name: hierarchy[currentLevel],
+    children: []
+  };
+
+  groupedRegulations.children.push(node);
+
+  if (currentLevel === hierarchy.length - 1) {
+    return node;
+  }
+
+  return getOrCreateGroupedRegulationNode(node, hierarchy, currentLevel+1);
+}
+
+function groupRegulations(regulations) {
+  const groupedRegulations = {
+    type: 'group',
+    name: '<root>',
+    children: []
+  };
+
+  for (const regulation of regulations) {  
+    if (!regulation.hierarchies || regulation.hierarchies.length === 0) {
+      groupedRegulations.children.push({
+        type: 'regulation',
+        name: regulation.title,
+        content: regulation
+      });
+    } else {
+      for (const hierarchy of regulation.hierarchies) {
+          const node = getOrCreateGroupedRegulationNode(groupedRegulations, hierarchy.split('/'));
+          node.children.push({
+            type: 'regulation',
+            name: regulation.title,
+            content: regulation
+          });
+      }
+    }
+  }  
+
+  return groupedRegulations;
+}
+
+
+const upChevronIcon = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
+<path stroke-linecap="round" stroke-linejoin="round" d="m4.5 15.75 7.5-7.5 7.5 7.5" />
+</svg>
+`;
+
+const downChevronIcon = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
+<path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+</svg>`
+
+function setupCollapsibleButtons(groupings, parentNode, levelNumber) {
+  if (levelNumber === undefined || isNaN(Number(levelNumber)) || Number(levelNumber) < 0) {
+    levelNumber = 0;
+  }
+
+  for (const group of groupings) {
+    const uuid = crypto.randomUUID();
+    if (group.type === 'regulation') {      
+      const button = document.createElement('button');
+      button.className = 'w-full p-2 text-left hover:bg-gray-100 rounded';
+      
+      if (levelNumber > 0) {
+        button.className = button.className + ` ml-[${levelNumber*5}px]`
+      }
+
+      button.textContent = group.name;
+      button.onclick = () => handleOnModalSelectedRegulation(group.content);
+      parentNode.appendChild(button);
+    } else if (group.type === 'group') {
+      const section = document.createElement('div');
+      section.id = `section-container-${uuid}`;
+      section.className = "collapsible-section";
+      if (levelNumber > 0) {
+        section.className = section.className + ` ml-[${levelNumber*5}px]`
+      }
+
+      parentNode.appendChild(section);      
+  
+      const sectionBody = document.createElement('div');
+      sectionBody.id = `section-body-${uuid}`;
+      sectionBody.className = "collapsible-section-body";
+      sectionBody.style.display = 'none';
+    
+      const sectionHeader = document.createElement('div');
+      sectionHeader.id = `section-header-${uuid}`;
+      sectionHeader.className = "collapsible-section-header flex cursor-pointer p-2 hover:bg-gray-200 rounded";
+
+      sectionHeader.innerHTML = `<div class="w-14 flex-none">${downChevronIcon}</div><div class="w-64 flex-none">${group.name}</div>`;
+      sectionHeader.onclick = () => {
+        if (sectionBody.style.display === 'none') {
+          sectionBody.style.display = 'block';
+          sectionHeader.innerHTML = `<div class="w-14 flex-none">${upChevronIcon}</div><div class="w-64 flex-none">${group.name}</div>`;
+        } else {
+          sectionBody.style.display = 'none';
+          sectionHeader.innerHTML = `<div class="w-14 flex-none">${downChevronIcon}</div><div class="w-64 flex-none">${group.name}</div>`;
+        }
+      };
+
+      section.appendChild(sectionHeader);
+      section.appendChild(sectionBody);
+        
+      setupCollapsibleButtons(group.children, sectionBody, levelNumber+1)
+    }
+  }  
+}
+
 function displayRegulationsList(regulations) {
+  const groupings = groupRegulations(regulations);
   const container = document.getElementById('regulation-list');
   container.innerHTML = '';
 
-  regulations.forEach(reg => {
-    const button = document.createElement('button');
-    button.className = 'w-full p-2 text-left hover:bg-gray-100 rounded';
-    button.textContent = reg.title;
-    button.onclick = () => handleOnModalSelectedRegulation(reg);
-    container.appendChild(button);
-  });
+  setupCollapsibleButtons(groupings.children, container);
 }
 
 function setSelectedRegulation(regulation) {
@@ -473,7 +581,7 @@ function setSelectedRegulation(regulation) {
     console.error('setSelectedRegulation called with null/undefined regulation.');
     return;
   }
-  console.log(`Setting selected regulation: ${regulation.title} (${regulation.partitionKey})`);
+  
   localStorage.setItem('selectedRegulation', JSON.stringify(regulation));
   displaySelectedRegulation(regulation);
 }
@@ -529,17 +637,14 @@ function updateGrayedOutMessages() {
   const contextLimit = 7;
   const separatorMessageId = "out-of-scope-separator";
 
-  console.log("Updating grayed-out messages...");
-
   const existingSeparator = document.getElementById(separatorMessageId);
   if (existingSeparator) {
-    console.log("Removing existing separator...");
+    
     existingSeparator.remove();
   }
 
   /* multiply by 2 to get message as well as response */
   if (allMessages.length <= contextLimit * 2) {
-    console.log("Not enough messages to apply graying out.");
     return;
   }
 
@@ -562,7 +667,6 @@ function updateGrayedOutMessages() {
     separator.textContent =
       "The previous messages are considered out of scope to the current conversation but will be retained.";
 
-    console.log(`Adding separator after message index: ${lastGrayedOutIndex}`);
     allMessages[lastGrayedOutIndex].after(separator);
   } else {
     console.warn("No valid place found to insert the separator.");
