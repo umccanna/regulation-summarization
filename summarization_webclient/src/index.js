@@ -455,24 +455,6 @@ async function loadRegulations() {
   }
 }
 
-function findRegulationGroup(groupedRegulations, groupName){
-  let matchingGroup = null;
-
-  for (const group of groupedRegulations) {
-    if (group.type !== 'group') {
-      continue;
-    } 
-
-    if (group.name === groupName) {
-      return group;
-    }
-
-    return findRegulationGroup(group, leafName);
-  }
-
-  return matchingGroup;
-}
-
 function getOrCreateGroupedRegulationNode(groupedRegulations, hierarchy, currentLevel) {
   if (currentLevel === undefined) {
     currentLevel = 0;
@@ -512,8 +494,7 @@ function groupRegulations(regulations) {
 
   for (const regulation of regulations) {  
     if (!regulation.hierarchies || regulation.hierarchies.length === 0) {
-      const rootNode = getOrCreateGroupedRegulationNode(groupedRegulations, ['<root>']);
-      rootNode.children.push({
+      groupedRegulations.children.push({
         type: 'regulation',
         name: regulation.title,
         content: regulation
@@ -604,6 +585,7 @@ function displayRegulationsList(regulations) {
   const container = document.getElementById('regulation-list');
   container.innerHTML = '';
 
+  console.log(groupings);
   setupCollapsibleButtons(groupings.children, container);
 }
 
