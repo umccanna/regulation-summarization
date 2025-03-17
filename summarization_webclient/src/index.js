@@ -17,7 +17,6 @@ if (window.location.pathname === '/login/callback') {
   if (authClient.isLoginRedirect()) {
     authClient.token.parseFromUrl()
       .then(data => {
-        console.log('Tokens:', data.tokens);
         const { idToken } = data.tokens;
         sessionStorage.setItem('ID_TOKEN', JSON.stringify(idToken));
         window.location.replace("/");
@@ -254,8 +253,6 @@ async function sendMessage(message) {
   const typingIndicator = showTypingIndicator();
   const selectedRegulation = getSelectedRegulation();
 
-  console.log("Sending message with selected regulation:", selectedRegulation);
-
   try {
     const token = getToken();
     if (!token) {
@@ -308,8 +305,6 @@ async function sendMessage(message) {
 /* -------------------------------------------------------------------------- */
 async function loadConversation(conversationId) {
   try {
-    console.log(`Fetching conversation for conversationId: ${conversationId}`);
-
     const token = getToken();
     if (!token) {
       return;
@@ -330,10 +325,6 @@ async function loadConversation(conversationId) {
     }
 
     const messages = await response.json();
-    console.log('Retrieved conversation:', messages);
-
-    // Fetch regulations only once
-    console.log('Fetching regulations...');
 
     const regulationsResponse = await fetch(`${process.env.API_BASE_URL}/regulations`, {
       method: 'GET',
@@ -348,7 +339,6 @@ async function loadConversation(conversationId) {
     }
 
     const regulations = await regulationsResponse.json();
-    console.log('Retrieved regulations:', regulations);
 
     // Validate the conversation’s regulation
     const selectedRegulation = regulations.find(reg => reg.partitionKey === messages.regulation);
@@ -367,8 +357,6 @@ async function loadConversation(conversationId) {
       chatMessages.appendChild(errorDiv);
       return; // Stop further execution
     }
-
-    console.log(`Valid regulation found: ${selectedRegulation.title} (${selectedRegulation.partitionKey})`);
 
     // Update the UI with the correct regulation
     setSelectedRegulation(selectedRegulation);
@@ -585,7 +573,6 @@ function displayRegulationsList(regulations) {
   const container = document.getElementById('regulation-list');
   container.innerHTML = '';
 
-  console.log(groupings);
   setupCollapsibleButtons(groupings.children, container);
 }
 
@@ -594,7 +581,7 @@ function setSelectedRegulation(regulation) {
     console.error('setSelectedRegulation called with null/undefined regulation.');
     return;
   }
-  console.log(`Setting selected regulation: ${regulation.title} (${regulation.partitionKey})`);
+  
   localStorage.setItem('selectedRegulation', JSON.stringify(regulation));
   displaySelectedRegulation(regulation);
 }
@@ -650,17 +637,14 @@ function updateGrayedOutMessages() {
   const contextLimit = 7;
   const separatorMessageId = "out-of-scope-separator";
 
-  console.log("Updating grayed-out messages...");
-
   const existingSeparator = document.getElementById(separatorMessageId);
   if (existingSeparator) {
-    console.log("Removing existing separator...");
+    
     existingSeparator.remove();
   }
 
   /* multiply by 2 to get message as well as response */
   if (allMessages.length <= contextLimit * 2) {
-    console.log("Not enough messages to apply graying out.");
     return;
   }
 
@@ -683,7 +667,6 @@ function updateGrayedOutMessages() {
     separator.textContent =
       "The previous messages are considered out of scope to the current conversation but will be retained.";
 
-    console.log(`Adding separator after message index: ${lastGrayedOutIndex}`);
     allMessages[lastGrayedOutIndex].after(separator);
   } else {
     console.warn("No valid place found to insert the separator.");
