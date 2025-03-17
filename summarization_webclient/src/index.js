@@ -543,12 +543,21 @@ const downChevronIcon = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" vie
 <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
 </svg>`
 
-function setupCollapsibleButtons(groupings, parentNode) {
+function setupCollapsibleButtons(groupings, parentNode, levelNumber) {
+  if (levelNumber === undefined || isNaN(Number(levelNumber)) || Number(levelNumber) < 0) {
+    levelNumber = 0;
+  }
+
   for (const group of groupings) {
     const uuid = crypto.randomUUID();
     if (group.type === 'regulation') {      
       const button = document.createElement('button');
       button.className = 'w-full p-2 text-left hover:bg-gray-100 rounded';
+      
+      if (levelNumber > 0) {
+        button.className = button.className + ` ml-[${levelNumber*5}px]`
+      }
+
       button.textContent = group.name;
       button.onclick = () => handleOnModalSelectedRegulation(group.content);
       parentNode.appendChild(button);
@@ -556,6 +565,9 @@ function setupCollapsibleButtons(groupings, parentNode) {
       const section = document.createElement('div');
       section.id = `section-container-${uuid}`;
       section.className = "collapsible-section";
+      if (levelNumber > 0) {
+        section.className = section.className + ` ml-[${levelNumber*5}px]`
+      }
 
       parentNode.appendChild(section);      
   
@@ -566,23 +578,23 @@ function setupCollapsibleButtons(groupings, parentNode) {
     
       const sectionHeader = document.createElement('div');
       sectionHeader.id = `section-header-${uuid}`;
-      sectionHeader.className = "collapsible-section-header";
+      sectionHeader.className = "collapsible-section-header flex cursor-pointer p-2 hover:bg-gray-200 rounded";
 
-      sectionHeader.innerHTML = `<span>${downChevronIcon}</span><span>${group.name}</span>`;
+      sectionHeader.innerHTML = `<div class="w-14 flex-none">${downChevronIcon}</div><div class="w-64 flex-none">${group.name}</div>`;
       sectionHeader.onclick = () => {
         if (sectionBody.style.display === 'none') {
           sectionBody.style.display = 'block';
-          sectionHeader.innerHTML = `<span>${upChevronIcon}</span><span>${group.name}</span>`;
+          sectionHeader.innerHTML = `<div class="w-14 flex-none">${upChevronIcon}</div><div class="w-64 flex-none">${group.name}</div>`;
         } else {
           sectionBody.style.display = 'none';
-          sectionHeader.innerHTML = `<span>${downChevronIcon}</span><span>${group.name}</span>`;
+          sectionHeader.innerHTML = `<div class="w-14 flex-none">${downChevronIcon}</div><div class="w-64 flex-none">${group.name}</div>`;
         }
       };
 
       section.appendChild(sectionHeader);
       section.appendChild(sectionBody);
         
-      setupCollapsibleButtons(group.children, sectionBody)
+      setupCollapsibleButtons(group.children, sectionBody, levelNumber+1)
     }
   }  
 }
