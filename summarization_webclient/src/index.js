@@ -601,19 +601,10 @@ function setupCollapsibleButtons(groupings, parentNode, levelNumber) {
 
 function displayRegulationsList(regulations) {
   const groupings = groupRegulations(regulations);
-  console.log('groupings', groupings);
   const container = document.getElementById('regulation-list');
   container.innerHTML = '';
 
   setupCollapsibleButtons(groupings.children, container);
-
-  // regulations.forEach(reg => {
-  //   const button = document.createElement('button');
-  //   button.className = 'w-full p-2 text-left hover:bg-gray-100 rounded';
-  //   button.textContent = reg.title;
-  //   button.onclick = () => handleOnModalSelectedRegulation(reg);
-  //   container.appendChild(button);
-  // });
 }
 
 function setSelectedRegulation(regulation) {
