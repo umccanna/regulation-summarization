@@ -3,6 +3,99 @@
 const baseOktaURL = "https://milliman.okta.com";
 const appClientID = "0oa1uj3zlj5hatOW91d8";
 
+const preppedDocuments = [
+  {
+    "sectionName": "CMS Pricing Regulations",
+    "id":"cms-pricing-regulations-upcoming-documents",
+    "documents":{
+      "2025": ["IPPS Final + Proposed", "Rehab Final", "Psych Final", "OPPS Final + Proposed", "Prof Final + Proposed", "Dialysis Final"],
+      "2024": ["IPPS Final + Proposed", "Rehab Final", "Psych Final", "OPPS Final + Proposed", "Prof Final + Proposed", "Dialysis Final"],
+      "2023": ["IPPS Final + Proposed", "Rehab Final", "Psych Final", "OPPS Final + Proposed", "Prof Final + Proposed", "Dialysis Final"],
+      "2022": ["IPPS Final + Proposed", "Rehab Final", "Psych Final + Corrective Notice", "OPPS Final + Proposed", "Prof Final + Proposed", "Dialysis Final"],
+      "2021": ["IPPS Final + Proposed", "Rehab Final", "Psych Final + Corrective Notice", "OPPS Final + Proposed", "Prof Final + Proposed", "Dialysis Final"],
+      "2020": ["IPPS Final", "Rehab Final", "Psych Final", "OPPS Final + Proposed", "Prof Final + Proposed", "Dialysis Final"],
+      "2019": ["IPPS Final + Proposed", "Rehab Final", "Psych Final", "OPPS Final + Proposed", "Prof Final + Proposed", "Dialysis Final"],
+      "2018": ["IPPS Final + Proposed", "Rehab Final", "Psych Final", "OPPS Final + Proposed", "Prof Final + Proposed", "Dialysis Final"],
+      "2017": ["IPPS Final + Proposed", "Rehab Final", "Psych Final", "OPPS Final + Proposed", "Dialysis Final + Proposed"],
+      "2016": ["IPPS Final + Proposed", "Rehab Final", "Psych Final", "OPPS Final + Proposed", "Prof Final", "Dialysis Final"],
+      "2015": ["IPPS Final + Proposed", "Rehab Final + Corrective Notice", "Psych Final + Corrective Notice", "OPPS Final + Proposed", "Prof Final", "Dialysis Final"],
+    }
+  },
+  {
+    "sectionName": "MSSP",
+    "id":"mssp-still-upcoming-documents",
+    "documents":{
+      "2015": ["Final, Proposed"],
+      "2019": ["Final, Proposed"]
+    }
+  }
+];
+
+const inProgressDocuments = [
+  {
+    "sectionName": "CMS Pricing Regulations",
+    "id":"cms-pricing-regulations-still-sourcing",
+    "documents":{
+      "2015": ["HH Final", "LTCH Final", "SNF Final"],
+      "2016": ["HH Final", "LTCH Final", "SNF Final + Proposed"],
+      "2017": ["Prof Final", "LTCH Final", "HH Final", "SNF Final + Proposed"],
+      "2018": ["HH Final", "LTCH Final", "SNF Final + Proposed"],
+      "2019": ["LTCH Final", "HH Final", "SNF Final"],
+      "2020": ["LTCH Final", "HH Final", "SNF Final"],
+      "2022": ["LTCH Final", "SNF Final"],
+      "2021": ["LTCH Final", "HH Final", "SNF Final + Proposed"],
+      "2022": ["HH Final", "SNF Final" ],
+      "2023": ["LTCH Final", "HH Final", "SNF Final"],
+      "2024": ["LTCH Final", "HH Final", "SNF Final + Proposed"],
+      "2025": ["LTCH Final", "HH Final", "SNF Final + Proposed"]
+    }
+  },
+  {
+    "sectionName": "MSSP",
+    "id":"mssp-still-sourcing",
+    "documents":{
+      "2016": ["Final"],
+      "2017": ["Final"],
+      "2018": ["Final"],
+      "2020": ["Final"],
+      "2021": ["Final"],
+      "2024": ["Final"],
+      "2025": ["Final"]
+    }
+  }
+];
+
+function renderDocuments(containerId, data) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = data
+    .map((section) => {
+      const {sectionName, id, documents}  = section;
+      return `
+        <h4 class="text-2xl font-bold dark:text-white mt-3" id=${id}>${sectionName}</h4>
+        ${Object.entries(documents)
+          .map(
+            ([year, docs]) => `
+              <h5 class="text-xl font-bold dark:text-white mt-2">${year}</h5>
+              <ul class="list-disc list-inside">
+                ${docs.map((doc) => `<li>${doc}</li>`).join("")}
+              </ul>
+            `
+          )
+          .join("")}
+          <hr class="my-3" />
+      `;
+    })
+    .join("");
+}
+
+function renderLinks(containerId, data) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = data.map((section) => {
+    const { id, sectionName } = section;
+    return `<a href="#${id}" class="text-blue-600 hover:underline">${sectionName}</a>`
+  }).join(", ");
+}
+
 // Bootstrap the AuthJS Client
 const authClient = new OktaAuth({
   // Required Fields for OIDC client
@@ -166,7 +259,8 @@ const userInput = document.getElementById('user-input');
 const sendButton = document.getElementById('send-button');
 const newChatButton = document.getElementById('new-chat-button');
 const typingTemplate = document.getElementById('typing-template');
-const closeButton = document.getElementById('close-regulation-modal');
+const closeChooseRegulationButton = document.getElementById('close-regulation-modal');
+const closeUpcomingDocumentsButton = document.getElementById('close-upcoming-documents-modal');
 const signoutButton = document.getElementById('signout-button');
 const signinButton = document.getElementById('login-button');
 
@@ -399,7 +493,7 @@ async function loadConversation(conversationId) {
 
 function checkSelectedRegulation() {
   const selectedRegulation = getSelectedRegulation();
-  closeButton.classList.toggle('hidden', selectedRegulation ? false : true);
+  closeChooseRegulationButton.classList.toggle('hidden', selectedRegulation ? false : true);
 
   if (!selectedRegulation) {
     showRegulationModal();
@@ -512,7 +606,7 @@ const downChevronIcon = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" vie
 <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
 </svg>`
 
-function setupCollapsibleButtons(groupings, parentNode, levelNumber) {
+function setupCollapsibleOptions(groupings, parentNode, optionBuilder, levelNumber) {
   if (levelNumber === undefined || isNaN(Number(levelNumber)) || Number(levelNumber) < 0) {
     levelNumber = 0;
   }
@@ -520,16 +614,13 @@ function setupCollapsibleButtons(groupings, parentNode, levelNumber) {
   for (const group of groupings) {
     const uuid = crypto.randomUUID();
     if (group.type === 'regulation') {      
-      const button = document.createElement('button');
-      button.className = 'w-full p-2 text-left hover:bg-gray-100 rounded';
+      const option = optionBuilder(group);
       
       if (levelNumber > 0) {
-        button.className = button.className + ` ml-[${levelNumber*5}px]`
+        option.className = option.className + ` ml-[${levelNumber*5}px]`
       }
 
-      button.textContent = group.name;
-      button.onclick = () => handleOnModalSelectedRegulation(group.content);
-      parentNode.appendChild(button);
+      parentNode.appendChild(option);
     } else if (group.type === 'group') {
       const section = document.createElement('div');
       section.id = `section-container-${uuid}`;
@@ -563,7 +654,7 @@ function setupCollapsibleButtons(groupings, parentNode, levelNumber) {
       section.appendChild(sectionHeader);
       section.appendChild(sectionBody);
         
-      setupCollapsibleButtons(group.children, sectionBody, levelNumber+1)
+      setupCollapsibleOptions(group.children, sectionBody, optionBuilder, levelNumber+1)
     }
   }  
 }
@@ -573,7 +664,13 @@ function displayRegulationsList(regulations) {
   const container = document.getElementById('regulation-list');
   container.innerHTML = '';
 
-  setupCollapsibleButtons(groupings.children, container);
+  setupCollapsibleOptions(groupings.children, container, (group) => {    
+    const button = document.createElement('button');
+    button.className = 'w-full p-2 text-left hover:bg-gray-100 rounded';
+    button.textContent = group.name;
+    button.onclick = () => handleOnModalSelectedRegulation(group.content);
+    return button;
+  });
 }
 
 function setSelectedRegulation(regulation) {
@@ -609,11 +706,22 @@ function displaySelectedRegulation(regulation) {
 }
 
 document.getElementById('change-regulation').addEventListener('click', showRegulationModal);
+document.getElementById('show-upcoming-documents').addEventListener('click', showUpcomingDocumentsModal);
 
 function showRegulationModal() {
   const modal = document.getElementById('regulation-modal');
   modal.classList.remove('hidden');
   loadRegulations();
+}
+
+function showUpcomingDocumentsModal() {
+  const modal = document.getElementById('upcoming-documents-modal');
+  modal.classList.remove('hidden');
+}
+
+function hideUpcomingDocumentsModal() {
+  const modal = document.getElementById('upcoming-documents-modal');
+  modal.classList.add('hidden');
 }
 
 function hideRegulationModal() {
@@ -743,7 +851,8 @@ chatForm.addEventListener('submit', async (e) => {
 });
 
 newChatButton.addEventListener('click', handleOnNewChat);
-closeButton.addEventListener('click', hideRegulationModal);
+closeChooseRegulationButton.addEventListener('click', hideRegulationModal);
+closeUpcomingDocumentsButton.addEventListener('click', hideUpcomingDocumentsModal);
 signinButton.addEventListener('click', login);
 signoutButton.addEventListener('click', logout);
 
@@ -751,5 +860,9 @@ signoutButton.addEventListener('click', logout);
 document.addEventListener('DOMContentLoaded', () => {  
   init().then(() => {
     fetchConversationHistory();
+    renderDocuments("document-list", preppedDocuments);
+    renderLinks("document-list-links", preppedDocuments);
+    renderDocuments("sourced-documents", inProgressDocuments);
+    renderLinks("sourced-documents-links", inProgressDocuments);
   });
 });
