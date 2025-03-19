@@ -88,11 +88,18 @@ function renderDocuments(containerId, data) {
     .join("");
 }
 
+window.scrollToTargetId = function(targetId) {
+  const element = document.getElementById(targetId);
+  if (element) {
+    element.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' });
+  }
+}
+
 function renderLinks(containerId, data) {
   const container = document.getElementById(containerId);
   container.innerHTML = data.map((section) => {
     const { id, sectionName } = section;
-    return `<a href="#${id}" class="text-blue-600 hover:underline">${sectionName}</a>`
+    return `<a href="#$" class="text-blue-600 hover:underline" onclick="scrollToTargetId('${id}')">${sectionName}</a>`
   }).join(", ");
 }
 
