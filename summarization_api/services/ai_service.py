@@ -7,7 +7,7 @@ class AIService:
     def __init__(self):
         self.__api_key = get_config("AZURE_OPENAI_API_KEY")
         self.__api_endpoint = get_config("AZURE_OPENAI_ENDPOINT")
-        self.__api_version = "2024-02-01"
+        self.__api_version = "2024-05-01-preview"
         self.__chat_model = get_config("ChatModel")
     
     def __get_client(self):
@@ -20,7 +20,7 @@ class AIService:
     def __get_system_prompt(self, regulation):
         if regulation["partitionKey"] in ["OPPS_2024", "OPPS_2025", "PROF_2025"]:
             return '''
-                You are a CMS Regulation Analyst that analyzes pricing regulations and provides concise and accurate summaries of the regulations.  
+                    You are a CMS Regulation Analyst that analyzes pricing regulations and provides concise and accurate summaries of the regulations.  
                     Adhere to these high level guides when responding: 
 
                     * You are NOT a counselor or personal care advisor.  DO NOT provide any self help, mental health, or physcial health advice.  Only respond in relation to the regulations you are summarizing. If the regulations you are summarizing involves details related to self-help, counseling, mental health, of physical health then it is premitted to respond in relation to the regulations.  
@@ -36,7 +36,7 @@ class AIService:
         
         if regulation["partitionKey"] in ["PROF_2015_PROPOSED", "MSSP_2015_PROPOSED", "MSSP_2015_FINAL", "OPPS_2024_FINAL_V2", "OPPS_2025_FINAL_V2", "DIALYSIS_2025_FINAL", "DIALYSIS_2024_FINAL", "DIALYSIS_2023_FINAL", "DIALYSIS_2022_FINAL", "DIALYSIS_2021_FINAL", "DIALYSIS_2020_FINAL", "DIALYSIS_2019_FINAL", "DIALYSIS_2018_FINAL", "DIALYSIS_2017_FINAL", "DIALYSIS_2016_FINAL", "DIALYSIS_2015_FINAL"]:
             return '''
-                You are a CMS Regulation Analyst that analyzes pricing regulations and provides concise and accurate summaries of the regulations.  
+                    You are a CMS Regulation Analyst that analyzes pricing regulations and provides concise and accurate summaries of the regulations.  
                     Adhere to these high level guides when responding: 
 
                     * You are NOT a counselor or personal care advisor.  DO NOT provide any self help, mental health, or physcial health advice.  Only respond in relation to the regulations you are summarizing. If the regulations you are summarizing involves details related to self-help, counseling, mental health, of physical health then it is premitted to respond in relation to the regulations.  
@@ -62,10 +62,11 @@ class AIService:
                 * You are NOT a counselor or personal care advisor.  DO NOT provide any self help, mental health, or physcial health advice.  Only respond in relation to the document you are summarizing. If the document you are summarizing involves details related to self-help, counseling, mental health, of physical health then it is premitted to respond in relation to the document.  
                 * When you provide a list or numbered output provide atleast 3 sentences describing each item.  
                 * When you provide a list do not limit the number of items in the list.  Error on the side of too many items in the list.
-                * Remember Medicaid is NOT the same as Medicare
                 * Your main job is to assist the user with summarizing and providing interesting insights into the documents.  
                 * When prompted to do math, double check your work to verify accuracy. 
                 * When asked to provide page numbers look for the page number tag surrounding the text in the format of <Page {number}>{text}</Page {number}>
+                * Do NOT assume that information, restrictions, policies, or procedures related to Medicare apply to Medicaid unless explicitly stated. Treat Medicare and Medicaid as distinct programs unless a specific connection is provided. This means if a regulations is related to Medicare that does NOT mean it applies to Medicaid as well.
+                    - **If an assumption is explicitly stated then include that assumption in your response.**
             '''
         
         if regulation["partitionKey"] in ["AHEAD_NOFO_ALL_STATE_NARRATIVES", "AHEAD_NOFO_HAWAII_NARRATIVE", "AHEAD_NOFO_VERMONT_NARRATIVE", "AHEAD_NOFO_CONNECTICUT_NARRATIVE", "AHEAD_NOFO_MARYLAND_NARRATIVE", "AHEAD_NOFO_NEW_YORK_NARRATIVE", "AHEAD_NOFO_RHODE_ISLAND_NARRATIVE", "AHEAD_NOFO_2023_W_FIN_SPECS"]:
@@ -76,9 +77,10 @@ class AIService:
                 * You are NOT a counselor or personal care advisor.  DO NOT provide any self help, mental health, or physcial health advice.  Only respond in relation to the document you are summarizing. If the document you are summarizing involves details related to self-help, counseling, mental health, of physical health then it is premitted to respond in relation to the document.  
                 * When you provide a list or numbered output provide atleast 3 sentences describing each item.  
                 * When you provide a list do not limit the number of items in the list.  Error on the side of too many items in the list.
-                * Remember Medicaid is NOT the same as Medicare
                 * Your main job is to assist the user with summarizing and providing interesting insights into the documents.  
                 * When prompted to do math, double check your work to verify accuracy. 
+                * Do NOT assume that information, restrictions, policies, or procedures related to Medicare apply to Medicaid unless explicitly stated. Treat Medicare and Medicaid as distinct programs unless a specific connection is provided. This means if a regulations is related to Medicare that does NOT mean it applies to Medicaid as well.
+                    - **If an assumption is explicitly stated then include that assumption in your response.**
                 * If referencing content, **include the document name and page number when applicable.**  Each retrieved documnet chunk contains the following metadata"
                     - **`<DocumentName>`** - The name of the document.  
                     - **`<DocumentDescription>`** - A short description of the document.  
@@ -127,7 +129,9 @@ class AIService:
 
         chat_completion = openai_client.chat.completions.create(
             messages=messages,
-            model=self.__chat_model
+            model=self.__chat_model,
+            temperature=1,
+            top_p=1
         )
 
         decision = chat_completion.choices[0].message.content
@@ -156,7 +160,9 @@ class AIService:
                     '''
                 }
             ],
-            model=get_config("ChatModel")
+            model=get_config("ChatModel"),
+            temperature=1,
+            top_p=1
         )
 
         return chat_completion.choices[0].message.content
@@ -229,8 +235,12 @@ class AIService:
                     '''
                 }
             ],
-            model=get_config("ChatModel")
+            model=get_config("ChatModel"),
+            temperature=0.7,
+            top_p=0.95
         )
+
+        logging.info("Finished summarizing text")
 
         return chat_completion.choices[0].message.content
     
@@ -290,7 +300,9 @@ class AIService:
 
         chat_completion = openai_client.chat.completions.create(
             messages=messages,
-            model=self.__chat_model
+            model=self.__chat_model,
+            temperature=1,
+            top_p=1
         )
 
         decision = chat_completion.choices[0].message.content
@@ -363,14 +375,15 @@ class AIService:
         
         chat_completion = openai_client.chat.completions.create(
             messages=messages,
-            model=get_config("ChatModel")
+            model=get_config("ChatModel"),
+            temperature=0.7,
+            top_p=0.95
         )
 
         response_content = chat_completion.choices[0].message.content
 
         return response_content
 
-    
     def call_with_context(self, context: str, conversation_history: list, regulation, directions: str, fact_sheet: str, query: str):
         openai_client = self.__get_client()
 
@@ -378,10 +391,15 @@ class AIService:
 
         system_prompt = self.__get_system_prompt(regulation)
         if system_prompt:
-            messages.append({
+            system_prompt_pieces = system_prompt.split("\n") 
+            system_message = {
                 "role": "system",
-                "content": system_prompt
-            })
+                "content": [{
+                    "type": "text",
+                    "text": i
+                } for i in system_prompt_pieces]
+            }
+            messages.append(system_message)
         else:
             logging.warning(f'No system prompt found for {regulation}')
 
@@ -407,21 +425,26 @@ class AIService:
 
         new_user_message = {
                     "role": "user",
-                    "content": f'''
+                    "content": [{
+                            "type":"text",
+                            "text": c
+                        } for c in f'''
                         {new_user_message_content_pre_context}
 
                         Context:
                         {context}
 
                         {new_user_message_content_post_context}
-                    ''',
+                    '''.split("\n")],
                 }
 
         messages.append(new_user_message)
 
         chat_completion = openai_client.chat.completions.create(
             messages=messages,
-            model=get_config("ChatModel")
+            model=get_config("ChatModel"),
+            temperature=0.9,
+            top_p=1
         )
 
         response_content = chat_completion.choices[0].message.content
@@ -471,7 +494,9 @@ class AIService:
 
         chat_completion = openai_client.chat.completions.create(
             messages=messages,
-            model=get_config("ChatModel")
+            model=get_config("ChatModel"),
+            temperature=1,
+            top_p=1
         )
 
         return chat_completion.choices[0].message.content

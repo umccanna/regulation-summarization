@@ -2,6 +2,7 @@ from repositories.regulation_repository import RegulationRepository
 from repositories.conversation_repository import ConversationRepository
 from services.ai_service import AIService
 import logging
+import xml.etree.ElementTree as ET 
 
 class RegulationManager:
     def __init__(self):
@@ -58,25 +59,33 @@ class RegulationManager:
             
             converted_history.append({
                 "role": "user",
-                "content": ''.join(content_parts)
+                "content": [{
+                    "type": "text",
+                    "text": c
+                } for c in ''.join(content_parts).split("\n")]
             })
 
             if log["response"]:
                 converted_history.append({
                     "role": "assistant",
-                    "content": log["response"]
+                    "content": [{ 
+                        "type": "text",
+                        "text": log["response"]
+                    }]
                 })
         
         return converted_history
     
     def __get_directions_with_context(self):
         return '''
-            Use the "Context:" provided below, any previous message "Context:", your previous responses, or any previous "Fact Sheet:" to respond to the user's "Prompt:".  
+            Use the "Context:" provided below, any previous message "Context:", your previous responses, or any previous "Fact Sheet:" to respond to the user's "Prompt:".
+
             - If the answer is explicitly stated in the "Context:", prioritize that information.  
             - If the answer is not directly stated but can be **reasonably inferred** using logical deduction from the provided "Context:" or "Fact Sheet:", do so.  
+                - **When making such inferences, explain the reasoning step-by-step, clearly referencing the parts of the Context or Fact Sheet used to make the inference.**  
             - If you cannot infer a reasonable answer from the provided information, respond with: "I'm not sure how to help you with that. I may not have been designed to help with your request."
 
-            When responding, ensure that all reasoning is grounded in the provided "Context:", previous "Fact Sheet:", or prior responses. Do **not** make up information beyond what can be logically inferred. 
+            When responding, ensure that all reasoning is grounded in the provided "Context:", previous "Fact Sheet:", or prior responses. Do **not** make up information beyond what can be logically inferred.
 
         '''
     
@@ -94,8 +103,42 @@ class RegulationManager:
             - If prior responses imply a partial answer, clarify what is known while noting any missing details.  
 
             If a "Fact Sheet:" is provided, prioritize its content to inform and focus the response.
- 
+
         '''
+
+    def __merge_embeddings(self, embeddings):
+        if len(embeddings) > 0 and "<Chunk>" in embeddings[0]:
+            merged = []
+            merged_tracker = set()
+            for e in embeddings:
+                for chunk in e.split("</Chunk><Chunk>"):
+                    document_name_pieces = chunk.split("<DocumentName>")
+                    if len(document_name_pieces) == 0:
+                        return embeddings
+                    
+                    text_pieces = chunk.split("<Text>")
+                    if len(text_pieces) == 0:
+                        return embeddings
+                    
+                    page_pieces = chunk.split("<Page>")
+                    if len(page_pieces) == 0:
+                        return embeddings
+
+                    document_name = document_name_pieces[1][:document_name_pieces[1].find("</DocumentName>")]
+                    document_text = text_pieces[1][:text_pieces[1].find("</Text>")]
+                    document_page = page_pieces[1][:page_pieces[1].find("</Text>")]
+
+                    key = f"{document_name}_{document_text}_{document_page}"
+                    if key not in merged_tracker:
+                        merged_tracker.add(key)
+                        if not chunk.startswith("<Chunk>"):
+                            chunk = "<Chunk>" + chunk
+                        if not chunk.endswith("</Chunk>"):
+                            chunk = chunk + "</Chunk>"
+                        merged.append(chunk)
+            return merged
+                    
+        return embeddings
 
     def query_regulation(self, request):
         try:
@@ -146,6 +189,7 @@ class RegulationManager:
             # should_get_embeddings = self.__ai_service.should_pull_more_embeddings(improved_user_query, ai_formatted_conversation_history, selected_regulation)
             # if should_get_embeddings:
             generate_query_embeddings = self.__ai_service.generate_embeddings(improved_user_query)
+
             embeddings = self.__regulation_repository.query_embeddings(generate_query_embeddings, selected_regulation)
             if len(embeddings) == 0:
                 logging.error("No matches found in vector database. Querying without additional embeddings")
@@ -159,9 +203,14 @@ class RegulationManager:
                 )
             else:
                 directions = self.__get_directions_with_context()
-                context = " ".join([i["text"] for i in embeddings])
+                embedding_text = [i["text"] for i in embeddings]
+                # since we overlap embeddings while indexing we have to unoverlap them during search to cut down on context size
+                # this can cut the context by %25 in some cases
+                embedding_text = self.__merge_embeddings(embedding_text)
+                context = " ".join(embedding_text)
 
                 context_summarized = self.__ai_service.summarize_text(context)
+                logging.info("Calling service to answer question")
                 response = self.__ai_service.call_with_context(
                     context, 
                     ai_formatted_conversation_history, 
@@ -170,6 +219,7 @@ class RegulationManager:
                     fact_sheet,
                     improved_user_query
                 )
+                logging.info("Finished calling service to answer question")
                     
             # else:
             #     directions = self.__get_directions_without_context()
@@ -181,6 +231,7 @@ class RegulationManager:
             #         improved_user_query
             #     )
 
+            logging.info("Saving conversation log")
             self.__conversation_repository.save_conversation_log({
                 "conversationId": conversation["id"],
                 "userId": request["userId"],
@@ -192,6 +243,8 @@ class RegulationManager:
                 "directions": directions,
                 "response": response
             })
+            
+            logging.info("Finished saving conversation log")
 
             return {
                 "result": response,
