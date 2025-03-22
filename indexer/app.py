@@ -169,6 +169,17 @@ def index_using_pdf_to_image(document, chunk_size, spooling_size, cosmos_contain
             print(f"QUALITY CONTROL!!!!")
             print(f"Only {len(chunks)} Chunks Found. Chunks: {chunks}")
 
+        if len(chunks) == 0 and len(normalized_text) >= 20:
+            print("0 chunks found but normalized text isn't tiny.  Trying again")
+            chunks = chunk_text(normalized_text, openai_client)
+            
+            with open(run_directory_path.joinpath(f"page_text_chunks_{i+1}.txt"), "w") as w:
+                w.write(json.dumps(chunks)) 
+                
+            if len(chunks) <= 3:
+                print(f"QUALITY CONTROL!!!!")
+                print(f"Still Only {len(chunks)} Chunks Found. Chunks: {chunks}")
+        
         for text_chunk in chunks:
             cleaned_up_text = text_chunk.strip()
             # we don't want to index empty strings
@@ -194,7 +205,10 @@ def index_using_pdf_to_image(document, chunk_size, spooling_size, cosmos_contain
     overlap_and_upload_chunks(cosmos_container, chunk_accumulator, overlap_size, openai_client, False, total_chunks, total_chunks_uploaded, '')
 
     if get_config("CleanupTempData"):
-        run_directory_path.unlink() # delete run directory
+        try:
+            run_directory_path.unlink() # delete run directory
+        except Exception as e:
+            print(f"Failed to delete run directory {run_directory_path}.  Error: {e}")
     
     return (total_chunks, total_chunks_uploaded)
 
@@ -211,6 +225,10 @@ def index_using_pdfplumber(document, chunk_size, spooling_size, cosmos_container
             page.flush_cache()
             
             chunks = chunk_text(page_text, openai_client)
+            if len(chunks) <= 3:
+                print(f"QUALITY CONTROL!!!!")
+                print(f"Only {len(chunks)} Chunks Found. Chunks: {chunks}")
+
             for text in chunks:
                 cleaned_up_text = text.strip()
                 # we don't want to index empty strings
@@ -273,7 +291,6 @@ def upload_final_ruling():
             (final_total_chunks, final_total_chunks_uploaded) = index_using_pdfplumber(document, chunk_size, spooling_size, cosmos_container, overlap_size, openai_client, total_chunks, total_chunks_uploaded)
             total_chunks = final_total_chunks
             total_chunks_uploaded = final_total_chunks_uploaded
-        
 
 def overlap_and_upload_chunks(cosmos_container, chunk_accumulator, overlap_size, openai_client, ignore_last_index, total_chunks, total_already_uploaded, joining_character):
     overlapped_chunks = []

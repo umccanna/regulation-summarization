@@ -8,18 +8,18 @@ __configuration = {
     "Default": {
         "Documents":[
             {
-                "Location": "T:\\Data\\CMS\\Fee Schedules\\GenAI Summarization\\Analysis\\TextExractAndVectorization\\0_Final Ruling\\CY2025 OPPS Final Rule.pdf",
-                "Name": "CY2024 OPPS Final Rule",
-                "Description": "OPPS 2024 Final Rule"
+                "Location": "T:\\Data\\CMS\\Fee Schedules\\2025\\RBRVS\\Data\\00 - Proposed Rule\\2024-14828.pdf",
+                "Name": "2025 MSSP Proposed Rule",
+                "Description": "MSSP 2025 Proposed Rule"
             }
         ],
-        "FactSheetLocation": "T:\\Data\\CMS\\Fee Schedules\\GenAI Summarization\\Analysis\\TextExractAndVectorization\\0_Final Ruling\\CY2025 OPPS Final Rule Fact Sheet.pdf",
+        "FactSheetLocation": "T:\\Data\\CMS\\Fee Schedules\\2025\\RBRVS\\Data\\00 - Proposed Rule\\2025 Proposed Rule Fact Sheet MSSP.pdf",
         "ConvertToImagesFirst": True,
         "TempImageLocation": "C:\\src\\data\\extracted_images",
         "CleanupTempData": False,
         "StartingChunkCount": 0,
         "UseAIChunking": True,
-        "PartitionKey": "OPPS_2025_FINAL_V2",
+        "PartitionKey": "MSSP_2025_PROPOSED",
         "AZURE_OPENAI_ENDPOINT": "https://seattlehealth-openai.openai.azure.com/",
         "AZURE_OPENAI_API_KEY": "",
         "EmbeddingsModel": "seattlehealth-embeddings-small",
@@ -29,7 +29,7 @@ __configuration = {
         "DATABASE_NAME": "summarizations",
         "CONTAINER_NAME": "pricingregulations",
         "ChunkSize": 30,
-        "Overlap": 5,
+        "Overlap": 3,
         "ChunkingCharacter":". ",
         "SpoolingSize": 50
     }
