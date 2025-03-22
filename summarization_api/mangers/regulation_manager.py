@@ -56,13 +56,23 @@ class RegulationManager:
                     '''
                 )
 
+            content_texts = [{
+                    "type": "text",
+                    "text": c.strip()
+                } for c in ''.join(content_parts).split("\n")]
+            
+            content_parts_with_newlines = []
+            for i, text in enumerate(content_texts):
+                content_parts_with_newlines.append(text)
+                if i != len(content_texts) - 1:
+                    content_parts_with_newlines.append({
+                        "type": "text",
+                        "text": "\n"
+                    })
             
             converted_history.append({
                 "role": "user",
-                "content": [{
-                    "type": "text",
-                    "text": c
-                } for c in ''.join(content_parts).split("\n")]
+                "content": content_parts_with_newlines
             })
 
             if log["response"]:

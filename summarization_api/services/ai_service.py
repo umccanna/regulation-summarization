@@ -391,13 +391,24 @@ class AIService:
 
         system_prompt = self.__get_system_prompt(regulation)
         if system_prompt:
-            system_prompt_pieces = system_prompt.split("\n") 
+
+            system_prompt_parts = [{
+                    "type": "text",
+                    "text": i.strip()
+                } for i in system_prompt.split("\n")]
+            
+            system_prompt_parts_with_newlines = []
+            for i, text in enumerate(system_prompt_parts):
+                system_prompt_parts_with_newlines.append(text)
+                if i != len(system_prompt_parts) - 1:
+                    system_prompt_parts_with_newlines.append({
+                        "type": "text",
+                        "text": "\n"
+                    })
+
             system_message = {
                 "role": "system",
-                "content": [{
-                    "type": "text",
-                    "text": i
-                } for i in system_prompt_pieces]
+                "content": system_prompt_parts_with_newlines
             }
             messages.append(system_message)
         else:
@@ -423,11 +434,8 @@ class AIService:
 
         new_user_message_content_post_context = fact_sheet_prompt
 
-        new_user_message = {
-                    "role": "user",
-                    "content": [{
-                            "type":"text",
-                            "text": c
+        user_message_parts = [{
+                            "text": c.strip()
                         } for c in f'''
                         {new_user_message_content_pre_context}
 
@@ -435,7 +443,19 @@ class AIService:
                         {context}
 
                         {new_user_message_content_post_context}
-                    '''.split("\n")],
+                    '''.split("\n")]
+        user_message_parts_with_newlines = []
+        for i, text in enumerate(user_message_parts):
+            user_message_parts_with_newlines.append(text)
+            if i != len(user_message_parts) - 1:
+                user_message_parts_with_newlines.append({
+                    "type": "text",
+                    "text": "\n"
+                })
+
+        new_user_message = {
+                    "role": "user",
+                    "content": user_message_parts_with_newlines,
                 }
 
         messages.append(new_user_message)
