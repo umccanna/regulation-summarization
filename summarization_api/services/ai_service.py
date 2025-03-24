@@ -1,6 +1,6 @@
 import logging
 from config import get_config
-from openai import AzureOpenAI
+from openai import AsyncAzureOpenAI
 import re
 
 class AIService:
@@ -11,7 +11,7 @@ class AIService:
         self.__chat_model = get_config("ChatModel")
     
     def __get_client(self):
-        return AzureOpenAI(
+        return AsyncAzureOpenAI(
             api_key = self.__api_key,
             api_version = self.__api_version,
             azure_endpoint = self.__api_endpoint
@@ -90,7 +90,7 @@ class AIService:
         
         return None
 
-    def should_pull_fact_sheet(self, query: str, conversation_history: list, regulation):
+    async def should_pull_fact_sheet(self, query: str, conversation_history: list, regulation):
         if len(conversation_history) == 0:
             logging.info('No history, pull the fact sheet')
             return True
@@ -127,7 +127,7 @@ class AIService:
 
         logging.info('Determining if we should pull the fact sheet')
 
-        chat_completion = openai_client.chat.completions.create(
+        chat_completion = await openai_client.chat.completions.create(
             messages=messages,
             model=self.__chat_model,
             temperature=1,
@@ -140,12 +140,12 @@ class AIService:
 
         return decision.lower().strip() == 'yes'
     
-    def generate_title(self, text: str, max_length: int):
+    async def generate_title(self, text: str, max_length: int):
         openai_client = self.__get_client()
 
         logging.info('Getting title based on question')
 
-        chat_completion = openai_client.chat.completions.create(
+        chat_completion = await openai_client.chat.completions.create(
             messages=[
                 {
                     "role": "user",
@@ -167,7 +167,7 @@ class AIService:
 
         return chat_completion.choices[0].message.content
 
-    def summarize_text(self, text: str):
+    async def summarize_text(self, text: str):
         openai_client = self.__get_client()
 
         logging.info('Summarizing text')
@@ -203,7 +203,7 @@ class AIService:
                 - Each **unique Page** should receive its own summary.
             '''
 
-        chat_completion = openai_client.chat.completions.create(
+        chat_completion = await openai_client.chat.completions.create(
             messages=[
                 {
                     "role": "system",
@@ -257,12 +257,12 @@ class AIService:
         
         return text
     
-    def generate_embeddings(self, text: str):
+    async def generate_embeddings(self, text: str):
         openai_client = self.__get_client()
         normalized_query = self.__normalize_text(text)
-        return openai_client.embeddings.create(input = [normalized_query], model = get_config("EmbeddingsModel")).data[0].embedding
+        return (await openai_client.embeddings.create(input = [normalized_query], model = get_config("EmbeddingsModel"))).data[0].embedding
     
-    def should_pull_more_embeddings(self, query: str, conversation_history: list, regulation):
+    async def should_pull_more_embeddings(self, query: str, conversation_history: list, regulation):
         if len(conversation_history) == 0:
             logging.info('No history, should pull more embeddings')
             return True
@@ -298,7 +298,7 @@ class AIService:
                     ''',
                 })  
 
-        chat_completion = openai_client.chat.completions.create(
+        chat_completion = await openai_client.chat.completions.create(
             messages=messages,
             model=self.__chat_model,
             temperature=1,
@@ -311,7 +311,7 @@ class AIService:
 
         return decision.lower().strip() == 'yes'
     
-    def improve_query(self, query: str, conversation_history: list):
+    async def improve_query(self, query: str, conversation_history: list):
         openai_client = self.__get_client()
 
         messages = []
@@ -373,7 +373,7 @@ class AIService:
             '''
         })
         
-        chat_completion = openai_client.chat.completions.create(
+        chat_completion = await openai_client.chat.completions.create(
             messages=messages,
             model=get_config("ChatModel"),
             temperature=0.7,
@@ -384,7 +384,8 @@ class AIService:
 
         return response_content
 
-    def call_with_context(self, context: str, conversation_history: list, regulation, directions: str, fact_sheet: str, query: str):
+    async def call_with_context(self, context: str, conversation_history: list, regulation, directions: str, fact_sheet: str, query: str):
+        logging.info("Calling service to answer question")
         openai_client = self.__get_client()
 
         messages = []
@@ -465,7 +466,7 @@ class AIService:
 
         messages.append(new_user_message)
 
-        chat_completion = openai_client.chat.completions.create(
+        chat_completion = await openai_client.chat.completions.create(
             messages=messages,
             model=get_config("ChatModel"),
             temperature=.5,
@@ -473,10 +474,12 @@ class AIService:
         )
 
         response_content = chat_completion.choices[0].message.content
+        
+        logging.info("Finished calling service to answer question")
 
         return response_content
     
-    def call_without_context(self, conversation_history: list, regulation, directions: str, fact_sheet: str, query: str):
+    async def call_without_context(self, conversation_history: list, regulation, directions: str, fact_sheet: str, query: str):
         openai_client = self.__get_client()
 
         logging.info('Calling OpenAI without embeddings')
@@ -516,7 +519,7 @@ class AIService:
 
         messages.append(new_user_message)    
 
-        chat_completion = openai_client.chat.completions.create(
+        chat_completion = await openai_client.chat.completions.create(
             messages=messages,
             model=get_config("ChatModel"),
             temperature=1,

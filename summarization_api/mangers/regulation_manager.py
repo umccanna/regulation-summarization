@@ -2,7 +2,7 @@ from repositories.regulation_repository import RegulationRepository
 from repositories.conversation_repository import ConversationRepository
 from services.ai_service import AIService
 import logging
-import xml.etree.ElementTree as ET 
+import asyncio
 
 class RegulationManager:
     def __init__(self):
@@ -156,7 +156,7 @@ class RegulationManager:
 
             conversation = await self.__conversation_repository.get_conversation(request["userId"], request["conversationId"]) if request["conversationId"] else None
             if not conversation:
-                summarized_query = self.__ai_service.generate_title(request["query"], 30)
+                summarized_query = await self.__ai_service.generate_title(request["query"], 30)
                 conversation = await self.__conversation_repository.create_conversation(request["userId"], summarized_query, request["regulation"])
 
             # Limit messages sent to OpenAI (e.g., last 5)
@@ -179,10 +179,10 @@ class RegulationManager:
 
             fact_sheet = None
             if selected_regulation["hasFACTSheet"] and not already_has_fact_sheet:
-                should_include_fact_sheet = self.__ai_service.should_pull_fact_sheet(request["query"], ai_formatted_conversation_history, selected_regulation)
+                should_include_fact_sheet = await self.__ai_service.should_pull_fact_sheet(request["query"], ai_formatted_conversation_history, selected_regulation)
                 if should_include_fact_sheet:
                     fact_sheet = await self.__regulation_repository.get_fact_sheet(selected_regulation)
-                    fact_sheet = self.__ai_service.summarize_text(fact_sheet)
+                    fact_sheet = await self.__ai_service.summarize_text(fact_sheet)
 
             directions = None
             response = None
@@ -191,20 +191,18 @@ class RegulationManager:
             user_query = request["query"]
             improved_user_query = user_query
             if len(ai_formatted_conversation_history) > 0:
-                improved_user_query = self.__ai_service.improve_query(user_query, ai_formatted_conversation_history)    
+                improved_user_query = await self.__ai_service.improve_query(user_query, ai_formatted_conversation_history)    
                 logging.info(f'Improved Query: {improved_user_query}')
             else: 
                 logging.info('Not improving query.  Not enough context to be of any assistance')
                 
-            # should_get_embeddings = self.__ai_service.should_pull_more_embeddings(improved_user_query, ai_formatted_conversation_history, selected_regulation)
-            # if should_get_embeddings:
-            generate_query_embeddings = self.__ai_service.generate_embeddings(improved_user_query)
+            generate_query_embeddings = await self.__ai_service.generate_embeddings(improved_user_query)
 
             embeddings = await self.__regulation_repository.query_embeddings(generate_query_embeddings, selected_regulation)
             if len(embeddings) == 0:
                 logging.error("No matches found in vector database. Querying without additional embeddings")
                 directions = self.__get_directions_without_context()
-                response = self.__ai_service.call_without_context(
+                response = await self.__ai_service.call_without_context(
                     ai_formatted_conversation_history,
                     selected_regulation,
                     directions,
@@ -219,27 +217,20 @@ class RegulationManager:
                 embedding_text = self.__merge_embeddings(embedding_text)
                 context = " ".join(embedding_text)
 
-                context_summarized = self.__ai_service.summarize_text(context)
-                logging.info("Calling service to answer question")
-                response = self.__ai_service.call_with_context(
-                    context, 
-                    ai_formatted_conversation_history, 
-                    selected_regulation,
-                    directions,
-                    fact_sheet,
-                    improved_user_query
+                results = await asyncio.gather(
+                    self.__ai_service.summarize_text(context),
+                    self.__ai_service.call_with_context(
+                        context, 
+                        ai_formatted_conversation_history, 
+                        selected_regulation,
+                        directions,
+                        fact_sheet,
+                        improved_user_query
+                    )
                 )
-                logging.info("Finished calling service to answer question")
-                    
-            # else:
-            #     directions = self.__get_directions_without_context()
-            #     response = self.__ai_service.call_without_context(
-            #         ai_formatted_conversation_history,
-            #         selected_regulation,
-            #         directions,
-            #         fact_sheet,
-            #         improved_user_query
-            #     )
+                
+                context_summarized = results[0]
+                response = results[1]
 
             logging.info("Saving conversation log")
             await self.__conversation_repository.save_conversation_log({
@@ -261,6 +252,6 @@ class RegulationManager:
                 "conversationId": conversation["id"]
             }
 
-        except Exception as e:
-            logging.error(f"Error processing the query: {str(e)}")
+        except:
+            logging.exception("Error processing the query")
             return None
