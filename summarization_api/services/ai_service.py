@@ -395,7 +395,7 @@ class AIService:
             system_prompt_parts = [{
                     "type": "text",
                     "text": i.strip()
-                } for i in system_prompt.split("\n")]
+                } for i in system_prompt.split("\n") if len(i.strip()) > 0]
             
             system_prompt_parts_with_newlines = []
             for i, text in enumerate(system_prompt_parts):
@@ -410,9 +410,12 @@ class AIService:
                 "role": "system",
                 "content": system_prompt_parts_with_newlines
             }
+
+
             messages.append(system_message)
         else:
             logging.warning(f'No system prompt found for {regulation}')
+
 
         for message in conversation_history:
             messages.append(message)
@@ -424,26 +427,28 @@ class AIService:
                 {fact_sheet}
             '''
 
-        new_user_message_content_pre_context = f'''
+        new_user_message_content_with_context = f'''
             {directions}
 
-            Prompt:
-            {query}
+            Context:
+            {context}
 
         '''
 
         new_user_message_content_post_context = fact_sheet_prompt
 
         user_message_parts = [{
+                            "type": "text",
                             "text": c.strip()
                         } for c in f'''
-                        {new_user_message_content_pre_context}
-
-                        Context:
-                        {context}
+                        {new_user_message_content_with_context}
 
                         {new_user_message_content_post_context}
-                    '''.split("\n")]
+
+                        Prompt:
+                        {query}
+
+                    '''.split("\n") if len(c.strip()) > 0]
         user_message_parts_with_newlines = []
         for i, text in enumerate(user_message_parts):
             user_message_parts_with_newlines.append(text)
@@ -463,7 +468,7 @@ class AIService:
         chat_completion = openai_client.chat.completions.create(
             messages=messages,
             model=get_config("ChatModel"),
-            temperature=0.9,
+            temperature=.7,
             top_p=1
         )
 
@@ -471,7 +476,6 @@ class AIService:
 
         return response_content
     
-
     def call_without_context(self, conversation_history: list, regulation, directions: str, fact_sheet: str, query: str):
         openai_client = self.__get_client()
 
