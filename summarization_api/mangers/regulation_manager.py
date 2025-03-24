@@ -118,21 +118,21 @@ class RegulationManager:
 
     def __merge_embeddings(self, embeddings):
         try:
-            if len(embeddings) > 0 and "<Chunk>" in embeddings[0]:
+            if len(embeddings) > 0 and "<Chunk>" in embeddings[0] and "<DocumentName>" in embeddings[0] and "<Text>" in embeddings[0] and "<Page>" in embeddings[0]:
                 merged = []
                 merged_tracker = set()
                 for e in embeddings:
                     for chunk in e.split("</Chunk><Chunk>"):
                         document_name_pieces = chunk.split("<DocumentName>")
-                        if len(document_name_pieces) == 0:
+                        if len(document_name_pieces) < 2:
                             return embeddings
                         
                         text_pieces = chunk.split("<Text>")
-                        if len(text_pieces) == 0:
+                        if len(text_pieces) < 2:
                             return embeddings
                         
                         page_pieces = chunk.split("<Page>")
-                        if len(page_pieces) == 0:
+                        if len(page_pieces) < 2:
                             return embeddings
 
                         document_name = document_name_pieces[1][:document_name_pieces[1].find("</DocumentName>")]
