@@ -10,22 +10,22 @@ class RegulationManager:
         self.__conversation_repository = ConversationRepository()
         self.__ai_service = AIService()
 
-    def __get_matching_regulation(self, regulation_id: str):
-        available_regulations = self.__regulation_repository.get_available_regulations()
+    async def __get_matching_regulation(self, regulation_id: str):
+        available_regulations = await self.__regulation_repository.get_available_regulations()
         for regulation in available_regulations:
             if regulation["partitionKey"] == regulation_id:
                 return regulation
             
         return None
     
-    def migrate_conversations(self, old_user_id, new_user_id):
-        return self.__conversation_repository.migrate_conversations(old_user_id, new_user_id)
+    async def migrate_conversations(self, old_user_id, new_user_id):
+        return await self.__conversation_repository.migrate_conversations(old_user_id, new_user_id)
     
-    def get_available_regulations(self):
-        return self.__regulation_repository.get_available_regulations()
+    async def get_available_regulations(self):
+        return await self.__regulation_repository.get_available_regulations()
     
-    def get_conversations(self, user_id):
-        return self.__conversation_repository.get_conversations(user_id)
+    async def get_conversations(self, user_id):
+        return await self.__conversation_repository.get_conversations(user_id)
 
     def __convert_conversation_history_to_ai_format(self, conversation_log: list, use_raw_prompt: bool):
         converted_history = []
@@ -150,14 +150,14 @@ class RegulationManager:
                     
         return embeddings
 
-    def query_regulation(self, request):
+    async def query_regulation(self, request):
         try:
-            selected_regulation = self.__get_matching_regulation(request["regulation"])
+            selected_regulation = await self.__get_matching_regulation(request["regulation"])
 
-            conversation = self.__conversation_repository.get_conversation(request["userId"], request["conversationId"]) if request["conversationId"] else None
+            conversation = await self.__conversation_repository.get_conversation(request["userId"], request["conversationId"]) if request["conversationId"] else None
             if not conversation:
                 summarized_query = self.__ai_service.generate_title(request["query"], 30)
-                conversation = self.__conversation_repository.create_conversation(request["userId"], summarized_query, request["regulation"])
+                conversation = await self.__conversation_repository.create_conversation(request["userId"], summarized_query, request["regulation"])
 
             # Limit messages sent to OpenAI (e.g., last 5)
             CONTEXT_LIMIT = 7
@@ -181,7 +181,7 @@ class RegulationManager:
             if selected_regulation["hasFACTSheet"] and not already_has_fact_sheet:
                 should_include_fact_sheet = self.__ai_service.should_pull_fact_sheet(request["query"], ai_formatted_conversation_history, selected_regulation)
                 if should_include_fact_sheet:
-                    fact_sheet = self.__regulation_repository.get_fact_sheet(selected_regulation)
+                    fact_sheet = await self.__regulation_repository.get_fact_sheet(selected_regulation)
                     fact_sheet = self.__ai_service.summarize_text(fact_sheet)
 
             directions = None
@@ -200,7 +200,7 @@ class RegulationManager:
             # if should_get_embeddings:
             generate_query_embeddings = self.__ai_service.generate_embeddings(improved_user_query)
 
-            embeddings = self.__regulation_repository.query_embeddings(generate_query_embeddings, selected_regulation)
+            embeddings = await self.__regulation_repository.query_embeddings(generate_query_embeddings, selected_regulation)
             if len(embeddings) == 0:
                 logging.error("No matches found in vector database. Querying without additional embeddings")
                 directions = self.__get_directions_without_context()
@@ -242,7 +242,7 @@ class RegulationManager:
             #     )
 
             logging.info("Saving conversation log")
-            self.__conversation_repository.save_conversation_log({
+            await self.__conversation_repository.save_conversation_log({
                 "conversationId": conversation["id"],
                 "userId": request["userId"],
                 "promptRaw": user_query,

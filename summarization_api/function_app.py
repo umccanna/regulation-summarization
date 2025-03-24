@@ -8,7 +8,7 @@ from mangers.token_manager import TokenManager
 app = func.FunctionApp()
 
 @app.route(route="summarize", auth_level=func.AuthLevel.ANONYMOUS, methods=["POST"])
-def SummarizationAPI(req: func.HttpRequest) -> func.HttpResponse:
+async def SummarizationAPI(req: func.HttpRequest) -> func.HttpResponse:
     token = parse_token(req)
     if not token:
         return func.HttpResponse(
@@ -36,7 +36,7 @@ def SummarizationAPI(req: func.HttpRequest) -> func.HttpResponse:
     
     manager = RegulationManager()
 
-    response_content = manager.query_regulation({
+    response_content = await manager.query_regulation({
         "regulation": regulation,
         "query": query,
         "conversationId": conversation_id,
@@ -56,7 +56,7 @@ def SummarizationAPI(req: func.HttpRequest) -> func.HttpResponse:
         )
     
 @app.route(route="conversations/migrate", auth_level=func.AuthLevel.ANONYMOUS, methods=["POST"])
-def MigrateConversationsAPI(req: func.HttpRequest) -> func.HttpResponse:
+async def MigrateConversationsAPI(req: func.HttpRequest) -> func.HttpResponse:
     token = parse_token(req)
     if not token:
         return func.HttpResponse(
@@ -74,7 +74,7 @@ def MigrateConversationsAPI(req: func.HttpRequest) -> func.HttpResponse:
         )
     
     manager = RegulationManager()
-    success = manager.migrate_conversations(old_user_id, new_user_id)
+    success = await manager.migrate_conversations(old_user_id, new_user_id)
 
     if success:
         return func.HttpResponse(
@@ -87,7 +87,7 @@ def MigrateConversationsAPI(req: func.HttpRequest) -> func.HttpResponse:
 
     
 @app.route(route="conversations/list", auth_level=func.AuthLevel.ANONYMOUS, methods=["POST"])
-def GetConversationListsAPI(req: func.HttpRequest) -> func.HttpResponse:
+async def GetConversationListsAPI(req: func.HttpRequest) -> func.HttpResponse:
     token = parse_token(req)
     if not token:
         return func.HttpResponse(
@@ -103,7 +103,7 @@ def GetConversationListsAPI(req: func.HttpRequest) -> func.HttpResponse:
         )
 
     manager = RegulationManager()
-    conversations = manager.get_conversations(user_id)
+    conversations = await manager.get_conversations(user_id)
 
     return func.HttpResponse(
         json.dumps(conversations),
@@ -112,7 +112,7 @@ def GetConversationListsAPI(req: func.HttpRequest) -> func.HttpResponse:
     ) 
 
 @app.route(route="conversations/load", auth_level=func.AuthLevel.ANONYMOUS, methods=["POST"])
-def GetConversationAPI(req: func.HttpRequest) -> func.HttpResponse:
+async def GetConversationAPI(req: func.HttpRequest) -> func.HttpResponse:
     token = parse_token(req)
     if not token:
         return func.HttpResponse(
@@ -128,7 +128,7 @@ def GetConversationAPI(req: func.HttpRequest) -> func.HttpResponse:
             return func.HttpResponse("Conversation Id is required", status_code=400)
 
         repository = ConversationRepository()
-        conversation = repository.get_conversation(user_id, conversation_id)
+        conversation = await repository.get_conversation(user_id, conversation_id)
 
         if conversation is None:
             return func.HttpResponse("Conversation not found", status_code=404)
@@ -146,7 +146,7 @@ def GetConversationAPI(req: func.HttpRequest) -> func.HttpResponse:
         )
     
 @app.route(route="regulations", auth_level=func.AuthLevel.ANONYMOUS, methods=["GET"])
-def GetSupportedRegulationsAPI(req: func.HttpRequest) -> func.HttpResponse:
+async def GetSupportedRegulationsAPI(req: func.HttpRequest) -> func.HttpResponse:
     token = parse_token(req)
     if not token:
         return func.HttpResponse(
@@ -154,7 +154,7 @@ def GetSupportedRegulationsAPI(req: func.HttpRequest) -> func.HttpResponse:
         )
     
     manager = RegulationManager()
-    regulations = manager.get_available_regulations()
+    regulations = await manager.get_available_regulations()
     return func.HttpResponse(
         json.dumps(regulations),
         status_code=200,
