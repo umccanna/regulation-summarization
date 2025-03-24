@@ -117,36 +117,39 @@ class RegulationManager:
         '''
 
     def __merge_embeddings(self, embeddings):
-        if len(embeddings) > 0 and "<Chunk>" in embeddings[0]:
-            merged = []
-            merged_tracker = set()
-            for e in embeddings:
-                for chunk in e.split("</Chunk><Chunk>"):
-                    document_name_pieces = chunk.split("<DocumentName>")
-                    if len(document_name_pieces) == 0:
-                        return embeddings
-                    
-                    text_pieces = chunk.split("<Text>")
-                    if len(text_pieces) == 0:
-                        return embeddings
-                    
-                    page_pieces = chunk.split("<Page>")
-                    if len(page_pieces) == 0:
-                        return embeddings
+        try:
+            if len(embeddings) > 0 and "<Chunk>" in embeddings[0]:
+                merged = []
+                merged_tracker = set()
+                for e in embeddings:
+                    for chunk in e.split("</Chunk><Chunk>"):
+                        document_name_pieces = chunk.split("<DocumentName>")
+                        if len(document_name_pieces) == 0:
+                            return embeddings
+                        
+                        text_pieces = chunk.split("<Text>")
+                        if len(text_pieces) == 0:
+                            return embeddings
+                        
+                        page_pieces = chunk.split("<Page>")
+                        if len(page_pieces) == 0:
+                            return embeddings
 
-                    document_name = document_name_pieces[1][:document_name_pieces[1].find("</DocumentName>")]
-                    document_text = text_pieces[1][:text_pieces[1].find("</Text>")]
-                    document_page = page_pieces[1][:page_pieces[1].find("</Text>")]
+                        document_name = document_name_pieces[1][:document_name_pieces[1].find("</DocumentName>")]
+                        document_text = text_pieces[1][:text_pieces[1].find("</Text>")]
+                        document_page = page_pieces[1][:page_pieces[1].find("</Text>")]
 
-                    key = f"{document_name}_{document_text}_{document_page}"
-                    if key not in merged_tracker:
-                        merged_tracker.add(key)
-                        if not chunk.startswith("<Chunk>"):
-                            chunk = "<Chunk>" + chunk
-                        if not chunk.endswith("</Chunk>"):
-                            chunk = chunk + "</Chunk>"
-                        merged.append(chunk)
-            return merged
+                        key = f"{document_name}_{document_text}_{document_page}"
+                        if key not in merged_tracker:
+                            merged_tracker.add(key)
+                            if not chunk.startswith("<Chunk>"):
+                                chunk = "<Chunk>" + chunk
+                            if not chunk.endswith("</Chunk>"):
+                                chunk = chunk + "</Chunk>"
+                            merged.append(chunk)
+                return merged
+        except:
+            logging.exception("Failed to merge embeddings. Defaulting to unmerged embeddings")
                     
         return embeddings
 
