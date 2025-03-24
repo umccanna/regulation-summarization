@@ -468,7 +468,7 @@ class AIService:
         chat_completion = openai_client.chat.completions.create(
             messages=messages,
             model=get_config("ChatModel"),
-            temperature=.7,
+            temperature=.5,
             top_p=1
         )
 
