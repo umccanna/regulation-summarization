@@ -6,6 +6,7 @@ from cryptography.hazmat.primitives import serialization
 import requests
 from config import get_config
 import json
+import logging
 
 class TokenManager:
     def __init__(self):
@@ -24,4 +25,5 @@ class TokenManager:
             token_claims = jwt.decode(token, pem_key, audience=self._audience, issuer=self._issuer, algorithms=[jwt_header["alg"]])
             return token_claims
         except:
+            logging.exception("Failed to validate JWT")
             return None

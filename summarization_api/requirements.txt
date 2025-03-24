@@ -9,3 +9,4 @@ azure-cosmos
 requests
 cryptography
 PyJWT
+aiohttp
