@@ -34,7 +34,7 @@ class AIService:
                     * When asked to provide page numbers look for the page number tag surrounding the text in the format of <Page {number}>{text}</Page {number}>
             '''
         
-        if regulation["partitionKey"] in ["PROF_2015_PROPOSED", "MSSP_2015_PROPOSED", "MSSP_2015_FINAL", "OPPS_2024_FINAL_V2", "OPPS_2025_FINAL_V2", "DIALYSIS_2025_FINAL", "DIALYSIS_2024_FINAL", "DIALYSIS_2023_FINAL", "DIALYSIS_2022_FINAL", "DIALYSIS_2021_FINAL", "DIALYSIS_2020_FINAL", "DIALYSIS_2019_FINAL", "DIALYSIS_2018_FINAL", "DIALYSIS_2017_FINAL", "DIALYSIS_2016_FINAL", "DIALYSIS_2015_FINAL"]:
+        if regulation["partitionKey"] in ["PROF_2015_PROPOSED", "MSSP_2015_PROPOSED", "MSSP_2015_FINAL", "OPPS_2024_FINAL_V2", "OPPS_2025_FINAL_V2", "DIALYSIS_2025_FINAL", "DIALYSIS_2024_FINAL", "DIALYSIS_2023_FINAL", "DIALYSIS_2022_FINAL", "DIALYSIS_2021_FINAL", "DIALYSIS_2020_FINAL", "DIALYSIS_2019_FINAL", "DIALYSIS_2018_FINAL", "DIALYSIS_2017_FINAL", "DIALYSIS_2016_FINAL", "DIALYSIS_2015_FINAL", "MSSP_2024_PROPOSED", "MSSP_2024_FINAL", "MSSP_2025_PROPOSED", "MSSP_2025_FINAL"]:
             return '''
                     You are a CMS Regulation Analyst that analyzes pricing regulations and provides concise and accurate summaries of the regulations.  
                     Adhere to these high level guides when responding: 

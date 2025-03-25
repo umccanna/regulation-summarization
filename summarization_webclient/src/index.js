@@ -26,7 +26,12 @@ const preppedDocuments = [
     "id":"mssp-still-upcoming-documents",
     "documents":{
       "2015": ["Final, Proposed"],
-      "2019": ["Final, Proposed"]
+      "2019": ["Final, Proposed"],
+      "2020": ["Final, Proposed"],
+      "2021": ["Final, Proposed"],
+      "2022": ["Final, Proposed"],
+      "2023": ["Final, Proposed"],
+      "2024": ["Proposed"]
     }
   }
 ];
@@ -48,19 +53,6 @@ const inProgressDocuments = [
       "2023": ["LTCH Final", "HH Final", "SNF Final"],
       "2024": ["LTCH Final", "HH Final", "SNF Final + Proposed"],
       "2025": ["LTCH Final", "HH Final", "SNF Final + Proposed"]
-    }
-  },
-  {
-    "sectionName": "MSSP",
-    "id":"mssp-still-sourcing",
-    "documents":{
-      "2016": ["Final"],
-      "2017": ["Final"],
-      "2018": ["Final"],
-      "2020": ["Final"],
-      "2021": ["Final"],
-      "2024": ["Final"],
-      "2025": ["Final"]
     }
   }
 ];
