@@ -8,9 +8,9 @@ __configuration = {
     "Default": {
         "Documents":[
             {
-                "Location": "T:\\Data\\CMS\\Fee Schedules\\2025\\RBRVS\\Data\\00 - Proposed Rule\\2024-14828.pdf",
-                "Name": "2025 MSSP Proposed Rule",
-                "Description": "MSSP 2025 Proposed Rule"
+                "Location": "T:\\Data\\CMS\\Fee Schedules\\2024\\RBRVS\\Data\\00 - Proposed Rule\\2023-14624.pdf",
+                "Name": "2024 MSSP Proposed Rule",
+                "Description": "MSSP 2024 Proposed Rule"
             }
         ],
         "FactSheetLocation": "T:\\Data\\CMS\\Fee Schedules\\2025\\RBRVS\\Data\\00 - Proposed Rule\\2025 Proposed Rule Fact Sheet MSSP.pdf",
@@ -19,7 +19,7 @@ __configuration = {
         "CleanupTempData": False,
         "StartingChunkCount": 0,
         "UseAIChunking": True,
-        "PartitionKey": "MSSP_2025_PROPOSED",
+        "PartitionKey": "MSSP_2024_PROPOSED",
         "AZURE_OPENAI_ENDPOINT": "https://seattlehealth-openai.openai.azure.com/",
         "AZURE_OPENAI_API_KEY": "",
         "EmbeddingsModel": "seattlehealth-embeddings-small",
