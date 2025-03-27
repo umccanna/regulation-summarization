@@ -3,6 +3,7 @@ from repositories.conversation_repository import ConversationRepository
 from services.ai_service import AIService
 import logging
 import asyncio
+import re
 
 class RegulationManager:
     def __init__(self):
@@ -153,6 +154,43 @@ class RegulationManager:
                     
         return embeddings
 
+    def __group_embeddings_by_document_name(self, embeddings):
+        grouped_embeddings = []
+
+        if len(embeddings) > 0 and "<DocumentName>" in embeddings[0]["text"]:
+            for e in embeddings:
+                match = re.search(r"<DocumentName>(.*?)</DocumentName>", e["text"])
+                print("Match", match)
+                document_name = match.group(1) if match else None
+
+                if not document_name:
+                    document_name = "Default"
+
+                matching_group = next((g for g in grouped_embeddings if g["name"] == document_name), None)
+                if matching_group:
+                    matching_group["text"].append(e["text"])
+                else:
+                    grouped = {
+                        "name": document_name,
+                        "text": [e["text"]]
+                    }
+                    grouped_embeddings.append(grouped)
+        else:
+            grouped = {
+                "name": "Default",
+                "text": []
+            }
+            for e in embeddings:
+                grouped["text"].append(e["text"])
+            grouped_embeddings.append(grouped)
+            
+        return grouped_embeddings
+    
+    def __merge_grouped_embeddings(self, grouped_embeddings):
+        for g in grouped_embeddings:
+            merged_embeddings = self.__merge_embeddings(g["text"])
+            g["text"] = merged_embeddings
+
     async def query_regulation(self, request):
         try:
             selected_regulation = await self.__get_matching_regulation(request["regulation"])
@@ -189,7 +227,7 @@ class RegulationManager:
 
             directions = None
             response = None
-            context = None
+            context_raw = None
             context_summarized = None
             user_query = request["query"]
             improved_user_query = user_query
@@ -214,26 +252,39 @@ class RegulationManager:
                 )
             else:
                 directions = self.__get_directions_with_context()
-                embedding_text = [i["text"] for i in embeddings]
+                
+                grouped_embeddings = self.__group_embeddings_by_document_name(embeddings)
+                
                 # since we overlap embeddings while indexing we have to unoverlap them during search to cut down on context size
                 # this can cut the context by %25 in some cases
-                embedding_text = self.__merge_embeddings(embedding_text)
-                context = " ".join(embedding_text)
+                self.__merge_grouped_embeddings(grouped_embeddings)
+
+                sem = asyncio.Semaphore(2)
+
+                async def summarize_text_with_sem(context):
+                    async with sem:
+                        return await self.__ai_service.summarize_text(context)
+                    
+                def combine_and_clean_embeddings(embedding_text):
+                    return " ".join(embedding_text).replace("> <", "><")
+                    
+                merged_context_raw = self.__merge_embeddings([e["text"] for e in embeddings])
+                context_raw = combine_and_clean_embeddings(merged_context_raw)
 
                 results = await asyncio.gather(
-                    self.__ai_service.summarize_text(context),
                     self.__ai_service.call_with_context(
-                        context, 
+                        context_raw, 
                         ai_formatted_conversation_history, 
                         selected_regulation,
                         directions,
                         fact_sheet,
                         improved_user_query
-                    )
+                    ),
+                    *[summarize_text_with_sem(combine_and_clean_embeddings(t["text"])) for t in grouped_embeddings]
                 )
                 
-                context_summarized = results[0]
-                response = results[1]
+                response = results[0]
+                context_summarized = "\n\n".join(results[1:])
 
             logging.info("Saving conversation log")
             await self.__conversation_repository.save_conversation_log({
@@ -241,7 +292,7 @@ class RegulationManager:
                 "userId": request["userId"],
                 "promptRaw": user_query,
                 "promptImproved": improved_user_query,
-                "contextRaw": context,
+                "contextRaw": context_raw,
                 "contextSummarized": context_summarized,
                 "factSheet": fact_sheet,
                 "directions": directions,
