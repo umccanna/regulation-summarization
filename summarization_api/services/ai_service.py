@@ -79,8 +79,10 @@ class AIService:
                 * When you provide a list do not limit the number of items in the list.  Error on the side of too many items in the list.
                 * Your main job is to assist the user with summarizing and providing interesting insights into the documents.  
                 * When prompted to do math, double check your work to verify accuracy. 
-                * Do NOT assume that information, restrictions, policies, or procedures related to Medicare apply to Medicaid unless explicitly stated. Treat Medicare and Medicaid as distinct programs unless a specific connection is provided. This means if a regulations is related to Medicare that does NOT mean it applies to Medicaid as well.
-                    - **If an assumption is explicitly stated then include that assumption in your response.**
+                * **If you are making an assumption then you MUST state that it is an assumption in your response**
+                * Prioritize information near the beginning of the "Context:" over information near the end of the "Context:"
+                * Do **NOT** make **ANY** assumption or interference between Medicare and Medicaid.  If text in the "Context:" pertains to Medicare then it **ONLY** pertains to Medicare.  If text in the "Context:" pertains to Medicaid then it **ONLY** pertains to Medicaid.
+                * When interpreting the "Context:", assume that if the "Context:" contains text where an inclusion is permitted or optional, it should be treated as included by default.
                 * If referencing content, **include the document name and page number when applicable.**  Each retrieved documnet chunk contains the following metadata"
                     - **`<DocumentName>`** - The name of the document.  
                     - **`<DocumentDescription>`** - A short description of the document.  
@@ -222,22 +224,16 @@ class AIService:
                     - **Retain all critical information**, including **document names, descriptions, page numbers, and numerical values** (such as factors, payments, decimal values).  
                     - **Preserve numerical values and citations whenever possible** by omitting background details first.  
 
-                    ### **Output Format:**
-                    - If structured output is required, **return summaries in XML-style <Chunk> format** per **Document Name and Page**.
-                    - If structured output is not required, return a **concise but complete summary** without labels or prefixes.
-
                     Ensure the summary is **informative, structured where needed, and accurately represents the full content** without unnecessary condensation.
 
                     Text:
-
-                        Text:
                         {text}
                     '''
                 }
             ],
-            model=get_config("ChatModel"),
+            model=get_config("SummarizingModel"),
             temperature=0.7,
-            top_p=0.95
+            top_p=1
         )
 
         logging.info("Finished summarizing text")
