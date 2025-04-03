@@ -8,18 +8,23 @@ __configuration = {
     "Default": {
         "Documents":[
             {
-                "Location": "T:\\Data\\CMS\\Fee Schedules\\2024\\RBRVS\\Data\\00 - Proposed Rule\\2023-14624.pdf",
-                "Name": "2024 MSSP Proposed Rule",
-                "Description": "MSSP 2024 Proposed Rule"
+                "Location": "C:\\src\\data\\gen_ai_load\\HGBTechSpec\\AHEAD_CMS Medicare FFS HGB technical specifications 3.0_At-A-Glance_Pre-508.pdf",
+                "Name": "AHEAD_CMS Medicare FFS HGB technical specifications 3.0_At-A-Glance_Pre-508",
+                "Description": "At-A-Glance overview of the CMS designed Medicare FFS HGB Version 3.0 Methodology"
+            },
+            {
+                "Location": "C:\\src\\data\\gen_ai_load\\HGBTechSpec\\AHEAD_CMS Medicare FFS HGB technical specifications 3.0_Pre-508.pdf",
+                "Name": "AHEAD_CMS Medicare FFS HGB technical specifications 3.0_Pre-508",
+                "Description": "Describes the financial methodology and operational payment features for Medicare FFS HGB under the AHEAD Model for Version 3.0"
             }
         ],
-        "FactSheetLocation": "T:\\Data\\CMS\\Fee Schedules\\2025\\RBRVS\\Data\\00 - Proposed Rule\\2025 Proposed Rule Fact Sheet MSSP.pdf",
+        "FactSheetLocation": None,
         "ConvertToImagesFirst": True,
         "TempImageLocation": "C:\\src\\data\\extracted_images",
         "CleanupTempData": False,
         "StartingChunkCount": 0,
         "UseAIChunking": True,
-        "PartitionKey": "MSSP_2024_PROPOSED",
+        "PartitionKey": "AHEAD_FFS_HGB_METHODOLOGY_3",
         "AZURE_OPENAI_ENDPOINT": "https://seattlehealth-openai.openai.azure.com/",
         "AZURE_OPENAI_API_KEY": "",
         "EmbeddingsModel": "seattlehealth-embeddings-small",
