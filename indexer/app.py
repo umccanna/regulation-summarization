@@ -124,7 +124,7 @@ def chunk_text(text, openai_client):
         )
 
         chunked_text = chat_completion.choices[0].message.content.strip()
-        return chunked_text.split("||||") if chunked_text != "No Chunks" else ""
+        return chunked_text.split("||||") if chunked_text != "No Chunks" else []
     
     normalized_page_text = strip_emails_and_phone_numbers_and_web_addresses(text)
     normalized_page_text = normalize_text(text)
@@ -176,9 +176,12 @@ def index_using_pdf_to_image(document, chunk_size, spooling_size, cosmos_contain
             with open(run_directory_path.joinpath(f"page_text_chunks_{i+1}.txt"), "w") as w:
                 w.write(json.dumps(chunks)) 
                 
-            if len(chunks) <= 3:
+            if len(chunks) == 0:
                 print(f"QUALITY CONTROL!!!!")
-                print(f"Still Only {len(chunks)} Chunks Found. Chunks: {chunks}")
+                print(f"Still Only 0 Chunks Found. Chunks: {chunks}")
+                print(f"Taking entire page")
+                # just take the whole page if we really can't chunk it up for some reason
+                chunks.append(normalized_text)
         
         for text_chunk in chunks:
             cleaned_up_text = text_chunk.strip()
@@ -229,6 +232,17 @@ def index_using_pdfplumber(document, chunk_size, spooling_size, cosmos_container
                 print(f"QUALITY CONTROL!!!!")
                 print(f"Only {len(chunks)} Chunks Found. Chunks: {chunks}")
 
+            if len(chunks) == 0 and len(page_text) >= 20:
+                print("0 chunks found but normalized text isn't tiny.  Trying again")
+                chunks = chunk_text(page_text, openai_client)
+                    
+                if len(chunks) == 0:
+                    print(f"QUALITY CONTROL!!!!")
+                    print(f"Still Only {len(chunks)} Chunks Found. Chunks: {chunks}")
+                    print(f"Taking entire page")
+                    # just take the whole page if we really can't chunk it up for some reason
+                    chunks.append(page_text)
+            
             for text in chunks:
                 cleaned_up_text = text.strip()
                 # we don't want to index empty strings
