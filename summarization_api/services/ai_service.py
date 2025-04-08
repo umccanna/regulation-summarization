@@ -80,7 +80,8 @@ class AIService:
                                           "AHEAD_NOFO_VERMONT_NARRATIVE", "AHEAD_NOFO_CONNECTICUT_NARRATIVE", 
                                           "AHEAD_NOFO_MARYLAND_NARRATIVE", "AHEAD_NOFO_NEW_YORK_NARRATIVE", 
                                           "AHEAD_NOFO_RHODE_ISLAND_NARRATIVE", "AHEAD_NOFO_2023_W_FIN_SPECS",
-                                          "AHEAD_FFS_HGB_METHODOLOGY_3"]:
+                                          "AHEAD_FFS_HGB_METHODOLOGY_3", "REACH_PY_2023", "REACH_PY_2024", "REACH_PY_2025", "REACH_RFA_2022",
+                                          "MEDPAC_PAYMENT_BASICS_24", "MEDPAC_PAYMENT_BASICS_23", "MSSP_SPECS_11", "MSSP_SPECS_12"]:
             return '''
                 You are an Analyst that analyzes documents and provides concise and accurate summaries of the documents. 
                 Adhere to these high level guides when responding: 

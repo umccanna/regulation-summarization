@@ -8,14 +8,104 @@ __configuration = {
     "Default": {
         "Documents":[
             {
-                "Location": "C:\\src\\data\\gen_ai_load\\HGBTechSpec\\AHEAD_CMS Medicare FFS HGB technical specifications 3.0_At-A-Glance_Pre-508.pdf",
-                "Name": "AHEAD_CMS Medicare FFS HGB technical specifications 3.0_At-A-Glance_Pre-508",
-                "Description": "At-A-Glance overview of the CMS designed Medicare FFS HGB Version 3.0 Methodology"
+                "Location": "T:\\Data\\CMS\\Fee Schedules\\MedPac\\23 Payment Basics\\MedPAC_Payment_Basics_23_ACOs_FINAL_SEC.pdf",
+                "Name": "MedPAC_Payment_Basics_23_ACOs_FINAL_SEC",
+                "Description": "MedPAC_Payment_Basics_23_ACOs_FINAL_SEC"
             },
             {
-                "Location": "C:\\src\\data\\gen_ai_load\\HGBTechSpec\\AHEAD_CMS Medicare FFS HGB technical specifications 3.0_Pre-508.pdf",
-                "Name": "AHEAD_CMS Medicare FFS HGB technical specifications 3.0_Pre-508",
-                "Description": "Describes the financial methodology and operational payment features for Medicare FFS HGB under the AHEAD Model for Version 3.0"
+                "Location": "T:\\Data\\CMS\\Fee Schedules\\MedPac\\23 Payment Basics\\MedPAC_Payment_Basics_23_ambulance_FINAL_SEC.pdf",
+                "Name": "MedPAC_Payment_Basics_23_ambulance_FINAL_SEC",
+                "Description": "MedPAC_Payment_Basics_23_ambulance_FINAL_SEC"
+            },
+            {
+                "Location": "T:\\Data\\CMS\\Fee Schedules\\MedPac\\23 Payment Basics\\MedPAC_Payment_Basics_23_ASC_FINAL_SEC.pdf",
+                "Name": "MedPAC_Payment_Basics_23_ASC_FINAL_SEC",
+                "Description": "MedPAC_Payment_Basics_23_ASC_FINAL_SEC"
+            },
+            {
+                "Location": "T:\\Data\\CMS\\Fee Schedules\\MedPac\\23 Payment Basics\\MedPAC_Payment_Basics_23_CAH_FINAL_SEC.pdf",
+                "Name": "MedPAC_Payment_Basics_23_CAH_FINAL_SEC",
+                "Description": "MedPAC_Payment_Basics_23_CAH_FINAL_SEC"
+            },
+            {
+                "Location": "T:\\Data\\CMS\\Fee Schedules\\MedPac\\23 Payment Basics\\MedPAC_Payment_Basics_23_clinical_lab_FINAL_SEC.pdf",
+                "Name": "MedPAC_Payment_Basics_23_clinical_lab_FINAL_SEC",
+                "Description": "MedPAC_Payment_Basics_23_clinical_lab_FINAL_SEC"
+            },
+            {
+                "Location": "T:\\Data\\CMS\\Fee Schedules\\MedPac\\23 Payment Basics\\MedPAC_Payment_Basics_23_dialysis_FINAL_SEC.pdf",
+                "Name": "MedPAC_Payment_Basics_23_dialysis_FINAL_SEC",
+                "Description": "MedPAC_Payment_Basics_23_dialysis_FINAL_SEC"
+            },
+            {
+                "Location": "T:\\Data\\CMS\\Fee Schedules\\MedPac\\23 Payment Basics\\MedPAC_Payment_Basics_23_DME_FINAL_SEC.pdf",
+                "Name": "MedPAC_Payment_Basics_23_DME_FINAL_SEC",
+                "Description": "MedPAC_Payment_Basics_23_DME_FINAL_SEC"
+            },
+            {
+                "Location": "T:\\Data\\CMS\\Fee Schedules\\MedPac\\23 Payment Basics\\MedPAC_Payment_Basics_23_FQHC_FINAL_SEC.pdf",
+                "Name": "MedPAC_Payment_Basics_23_FQHC_FINAL_SEC",
+                "Description": "MedPAC_Payment_Basics_23_FQHC_FINAL_SEC"
+            },
+            {
+                "Location": "T:\\Data\\CMS\\Fee Schedules\\MedPac\\23 Payment Basics\\MedPAC_Payment_Basics_23_HHA_FINAL_SEC.pdf",
+                "Name": "MedPAC_Payment_Basics_23_HHA_FINAL_SEC",
+                "Description": "MedPAC_Payment_Basics_23_HHA_FINAL_SEC"
+            },
+            {
+                "Location": "T:\\Data\\CMS\\Fee Schedules\\MedPac\\23 Payment Basics\\MedPAC_Payment_Basics_23_hospice_FINAL_SEC.pdf",
+                "Name": "MedPAC_Payment_Basics_23_hospice_FINAL_SEC",
+                "Description": "MedPAC_Payment_Basics_23_hospice_FINAL_SEC"
+            },
+            {
+                "Location": "T:\\Data\\CMS\\Fee Schedules\\MedPac\\23 Payment Basics\\MedPAC_Payment_Basics_23_hospital_FINAL_SEC.pdf",
+                "Name": "MedPAC_Payment_Basics_23_hospital_FINAL_SEC",
+                "Description": "MedPAC_Payment_Basics_23_hospital_FINAL_SEC"
+            },
+            {
+                "Location": "T:\\Data\\CMS\\Fee Schedules\\MedPac\\23 Payment Basics\\MedPAC_Payment_Basics_23_IRF_FINAL_SEC.pdf",
+                "Name": "MedPAC_Payment_Basics_23_IRF_FINAL_SEC",
+                "Description": "MedPAC_Payment_Basics_23_IRF_FINAL_SEC"
+            },
+            {
+                "Location": "T:\\Data\\CMS\\Fee Schedules\\MedPac\\23 Payment Basics\\MedPAC_Payment_Basics_23_LTCH_FINAL_SEC.pdf",
+                "Name": "MedPAC_Payment_Basics_23_LTCH_FINAL_SEC",
+                "Description": "MedPAC_Payment_Basics_23_LTCH_FINAL_SEC"
+            },
+            {
+                "Location": "T:\\Data\\CMS\\Fee Schedules\\MedPac\\23 Payment Basics\\MedPAC_Payment_Basics_23_MA_FINAL_SEC.pdf",
+                "Name": "MedPAC_Payment_Basics_23_MA_FINAL_SEC",
+                "Description": "MedPAC_Payment_Basics_23_MA_FINAL_SEC"
+            },
+            {
+                "Location": "T:\\Data\\CMS\\Fee Schedules\\MedPac\\23 Payment Basics\\MedPAC_Payment_Basics_23_OPD_FINAL_SEC.pdf",
+                "Name": "MedPAC_Payment_Basics_23_OPD_FINAL_SEC",
+                "Description": "MedPAC_Payment_Basics_23_OPD_FINAL_SEC"
+            },
+            {
+                "Location": "T:\\Data\\CMS\\Fee Schedules\\MedPac\\23 Payment Basics\\MedPAC_Payment_Basics_23_PartB_FINAL_SEC.pdf",
+                "Name": "MedPAC_Payment_Basics_23_PartB_FINAL_SEC",
+                "Description": "MedPAC_Payment_Basics_23_PartB_FINAL_SEC"
+            },
+            {
+                "Location": "T:\\Data\\CMS\\Fee Schedules\\MedPac\\23 Payment Basics\\MedPAC_Payment_Basics_23_PartD_FINAL_SEC.pdf",
+                "Name": "MedPAC_Payment_Basics_23_PartD_FINAL_SEC",
+                "Description": "MedPAC_Payment_Basics_23_PartD_FINAL_SEC"
+            },
+            {
+                "Location": "T:\\Data\\CMS\\Fee Schedules\\MedPac\\23 Payment Basics\\MedPAC_Payment_Basics_23_Physician_FINAL_SEC.pdf",
+                "Name": "MedPAC_Payment_Basics_23_Physician_FINAL_SEC",
+                "Description": "MedPAC_Payment_Basics_23_Physician_FINAL_SEC"
+            },
+            {
+                "Location": "T:\\Data\\CMS\\Fee Schedules\\MedPac\\23 Payment Basics\\MedPAC_Payment_Basics_23_psych_FINAL_SEC.pdf",
+                "Name": "MedPAC_Payment_Basics_23_psych_FINAL_SEC",
+                "Description": "MedPAC_Payment_Basics_23_psych_FINAL_SEC"
+            },
+            {
+                "Location": "T:\\Data\\CMS\\Fee Schedules\\MedPac\\23 Payment Basics\\MedPAC_Payment_Basics_23_SNF_FINAL_SEC.pdf",
+                "Name": "MedPAC_Payment_Basics_23_SNF_FINAL_SEC",
+                "Description": "MedPAC_Payment_Basics_23_SNF_FINAL_SEC"
             }
         ],
         "FactSheetLocation": None,
@@ -24,7 +114,7 @@ __configuration = {
         "CleanupTempData": False,
         "StartingChunkCount": 0,
         "UseAIChunking": True,
-        "PartitionKey": "AHEAD_FFS_HGB_METHODOLOGY_3",
+        "PartitionKey": "MEDPAC_PAYMENT_BASICS_23",
         "AZURE_OPENAI_ENDPOINT": "https://seattlehealth-openai.openai.azure.com/",
         "AZURE_OPENAI_API_KEY": "",
         "EmbeddingsModel": "seattlehealth-embeddings-small",
