@@ -616,7 +616,7 @@ function setupCollapsibleOptions(groupings, parentNode, optionBuilder, levelNumb
       const option = optionBuilder(group);
       
       if (levelNumber > 0) {
-        option.className = option.className + ` ml-[${levelNumber*5}px]`
+        option.className = option.className + ` ml-[${levelNumber*15}px]`
       }
 
       parentNode.appendChild(option);
@@ -625,7 +625,7 @@ function setupCollapsibleOptions(groupings, parentNode, optionBuilder, levelNumb
       section.id = `section-container-${uuid}`;
       section.className = "collapsible-section";
       if (levelNumber > 0) {
-        section.className = section.className + ` ml-[${levelNumber*5}px]`
+        section.className = section.className + ` ml-[${levelNumber*15}px]`
       }
 
       parentNode.appendChild(section);      
@@ -665,7 +665,7 @@ function displayRegulationsList(regulations) {
 
   setupCollapsibleOptions(groupings.children, container, (group) => {    
     const button = document.createElement('button');
-    button.className = 'w-full p-2 text-left hover:bg-gray-100 rounded';
+    button.className = 'w-full p-2 text-left hover:bg-gray-100 rounded max-w-64';
     button.textContent = group.name;
     button.onclick = () => handleOnModalSelectedRegulation(group.content);
     return button;
