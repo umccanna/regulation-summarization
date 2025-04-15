@@ -111,7 +111,7 @@ class RegulationManager:
 
             **Inference Rules:**  
             - You may **reword or synthesize** known facts, but do not introduce **new** details or assumptions.  
-            - If prior responses imply a partial answer, clarify what is known while noting any missing details.  
+            - If prior responses imply a partial answer, clarify what is known while noting any missing details.
 
             If a "Fact Sheet:" is provided, prioritize its content to inform and focus the response.
 
@@ -160,7 +160,6 @@ class RegulationManager:
         if len(embeddings) > 0 and "<DocumentName>" in embeddings[0]["text"]:
             for e in embeddings:
                 match = re.search(r"<DocumentName>(.*?)</DocumentName>", e["text"])
-                print("Match", match)
                 document_name = match.group(1) if match else None
 
                 if not document_name:
@@ -230,18 +229,16 @@ class RegulationManager:
             context_raw = None
             context_summarized = None
             user_query = request["query"]
-            improved_user_query = user_query
-            if len(ai_formatted_conversation_history) > 0:
-                improved_user_query = await self.__ai_service.improve_query(user_query, ai_formatted_conversation_history)    
-                logging.info(f'Improved Query: {improved_user_query}')
-            else: 
-                logging.info('Not improving query.  Not enough context to be of any assistance')
-                
-            generate_query_embeddings = await self.__ai_service.generate_embeddings(improved_user_query)
 
-            embeddings = await self.__regulation_repository.query_embeddings(generate_query_embeddings, selected_regulation)
-            if len(embeddings) == 0:
-                logging.error("No matches found in vector database. Querying without additional embeddings")
+            improved_user_query = user_query
+            improved_user_query = await self.__ai_service.improve_query(user_query, ai_formatted_conversation_history)    
+            logging.info(f'Improved Query: {improved_user_query}')
+
+            # be sure to check if we should pull more embeddings with the user provided query
+            # the improve query method above is helpful but it tends to add context that throws off the should pull more embeddings check
+            should_pull_embeddings = await self.__ai_service.should_pull_more_embeddings(user_query)
+            if not should_pull_embeddings:
+                logging.warning(f"Determined that we shouldn't pull more embeddings for prompt. Original Prompt: '{user_query}', Improved Prompt: '{improved_user_query}'")
                 directions = self.__get_directions_without_context()
                 response = await self.__ai_service.call_without_context(
                     ai_formatted_conversation_history,
@@ -251,40 +248,54 @@ class RegulationManager:
                     improved_user_query
                 )
             else:
-                directions = self.__get_directions_with_context()
-                
-                grouped_embeddings = self.__group_embeddings_by_document_name(embeddings)
-                
-                # since we overlap embeddings while indexing we have to unoverlap them during search to cut down on context size
-                # this can cut the context by %25 in some cases
-                self.__merge_grouped_embeddings(grouped_embeddings)
+                generate_query_embeddings = await self.__ai_service.generate_embeddings(improved_user_query)
 
-                sem = asyncio.Semaphore(2)
-
-                async def summarize_text_with_sem(context):
-                    async with sem:
-                        return await self.__ai_service.summarize_text(context)
-                    
-                def combine_and_clean_embeddings(embedding_text):
-                    return " ".join(embedding_text).replace("> <", "><")
-                    
-                merged_context_raw = self.__merge_embeddings([e["text"] for e in embeddings])
-                context_raw = combine_and_clean_embeddings(merged_context_raw)
-
-                results = await asyncio.gather(
-                    self.__ai_service.call_with_context(
-                        context_raw, 
-                        ai_formatted_conversation_history, 
+                embeddings = await self.__regulation_repository.query_embeddings(generate_query_embeddings, selected_regulation)
+                if len(embeddings) == 0:
+                    logging.error(f"No matches found in vector database. Querying without additional embeddings for prompt. Original Prompt: {user_query}, Improved Prompt: {improved_user_query}")
+                    directions = self.__get_directions_without_context()
+                    response = await self.__ai_service.call_without_context(
+                        ai_formatted_conversation_history,
                         selected_regulation,
                         directions,
                         fact_sheet,
                         improved_user_query
-                    ),
-                    *[summarize_text_with_sem(combine_and_clean_embeddings(t["text"])) for t in grouped_embeddings]
-                )
-                
-                response = results[0]
-                context_summarized = "\n\n".join(results[1:])
+                    )
+                else:
+                    directions = self.__get_directions_with_context()
+                    
+                    grouped_embeddings = self.__group_embeddings_by_document_name(embeddings)
+                    
+                    # since we overlap embeddings while indexing we have to unoverlap them during search to cut down on context size
+                    # this can cut the context by %25 in some cases
+                    self.__merge_grouped_embeddings(grouped_embeddings)
+
+                    sem = asyncio.Semaphore(3)
+
+                    async def summarize_text_with_sem(context):
+                        async with sem:
+                            return await self.__ai_service.summarize_text(context)
+                        
+                    def combine_and_clean_embeddings(embedding_text):
+                        return " ".join(embedding_text).replace("> <", "><")
+                        
+                    merged_context_raw = self.__merge_embeddings([e["text"] for e in embeddings])
+                    context_raw = combine_and_clean_embeddings(merged_context_raw)
+
+                    results = await asyncio.gather(
+                        self.__ai_service.call_with_context(
+                            context_raw, 
+                            ai_formatted_conversation_history, 
+                            selected_regulation,
+                            directions,
+                            fact_sheet,
+                            improved_user_query
+                        ),
+                        *[summarize_text_with_sem(combine_and_clean_embeddings(t["text"])) for t in grouped_embeddings]
+                    )
+                    
+                    response = results[0]
+                    context_summarized = "\n\n".join(results[1:])
 
             logging.info("Saving conversation log")
             await self.__conversation_repository.save_conversation_log({

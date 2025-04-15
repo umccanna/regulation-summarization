@@ -268,40 +268,43 @@ class AIService:
     async def generate_embeddings(self, text: str):
         openai_client = self.__get_client()
         normalized_query = self.__normalize_text(text)
+        logging.info(f"Normalized query {normalized_query}")
+        
         return (await openai_client.embeddings.create(input = [normalized_query], model = get_config("EmbeddingsModel"))).data[0].embedding
     
-    async def should_pull_more_embeddings(self, query: str, conversation_history: list, regulation):
-        if len(conversation_history) == 0:
-            logging.info('No history, should pull more embeddings')
-            return True
-        
+    async def should_pull_more_embeddings(self, query: str):        
         openai_client = self.__get_client()
         
         messages = []
-
-        system_prompt = self.__get_system_prompt(regulation)
-        if system_prompt:
-            messages.append({
-                "role": "system",
-                "content": system_prompt
-            })
-        else:
-            logging.warning(f'No system prompt found for {regulation}')
-
-        for message in conversation_history:
-            messages.append(message)
 
         logging.info('Determining if we should pull more embeddings')
 
         messages.append({
                     "role": "user",
                     "content": f'''
-                        Only provide a simple "yes" or "no" in response to this question.  Always respond in all lower case. 
+                        You are an expert assistant that determines whether a user message requires additional context or data lookup. 
+                        Evaluate only the explicit content of the message. Ignore politeness, tone, or vague references unless they clearly ask a question or imply missing data.
 
-                        I have a vector database full of information regarding CMS regulations.  Based on the below "Prompt", do I need to provide additional context from this database to answer this question?
-                        Please be very careful in how you respond and verify that the answer is the correct answer based on the conversaion history.
+                        Respond strictly:
 
-                        Prompt:
+                        Reply "Yes" only if the user prompt includes a question or phrase that requires:
+                        - Clarification of a prior statement,
+                        - A lookup from a database or external source,
+                        - Continuation of a previously referenced context or document.
+
+                        Reply "No" if the message is a general statement, reaction, acknowledgment, or does not contain a direct or implied question that needs more data.
+
+                        Examples:
+                        "How much does this plan cost in 2024?" -> Yes
+                        "What is the deductible on the bronze plan?" -> Yes
+                        "Thanks, that makes sense now." -> No
+                        "Summarize what you just told me." -> No
+                        "Which plan has the lowest out-of-pocket max?" -> Yes
+                        "Good morning!" -> No
+                        "That makes a lot of sense. Thank you for clarifying that." -> No
+                        "Could you explain the difference between the two plans again?" -> Yes
+
+                        Now evaluate the following message:
                         {query}
                     ''',
                 })  
@@ -328,7 +331,7 @@ class AIService:
             "role": "system",
             "content": '''
                 Your task is to rewrite and improve user queries by incorporating relevant context from previous messages, responses, and fact sheets. The goal is to refine the query for better clarity, specificity, and completeness while preserving the user's original intent.
-
+                                
                 ### **Rules for Query Enhancement:**
                 1. **Context-Aware Rewriting**  
                 - Identify and integrate any relevant information from past messages, responses, or fact sheets.
@@ -364,6 +367,7 @@ class AIService:
             "role": "user",
             "content": f'''
                 Analyze the "Prompt:" and improve it by incorporating relevant context from previous messages, responses, or fact sheets.  
+                ***Important*** DO NOT rewrite or improve the "Prompt:" if it is not a question or requesting clarification on a previous response or implying indirectly/directly that more information is required or if it's just a general statement. Just provide the original prompt as-is.
 
                 ### **Guidelines for Query Improvement:**
                 - **Enhance Clarity & Completeness** - Ensure the rewritten query is more precise and informative.
