@@ -206,6 +206,7 @@ def index_using_pdf_to_image(document, chunk_size, spooling_size, cosmos_contain
         text_accumulator = []
     
     overlap_and_upload_chunks(cosmos_container, chunk_accumulator, overlap_size, openai_client, False, total_chunks, total_chunks_uploaded, '')
+    total_chunks_uploaded+=len(chunk_accumulator)
 
     if get_config("CleanupTempData"):
         try:
