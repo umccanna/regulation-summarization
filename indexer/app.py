@@ -81,12 +81,12 @@ def upload_fact_sheet():
             print(f"Saving page {i+1}")
             create_document(cosmos_container, normalized_page_text, embeddings, i, partition_key, "FactSheet")
 
-def delete_document_type(document_type: str):
+def delete_document_type(document_type: str, starting_at: int = 0):
     print(f'Deleting document {document_type}')
     cosmos_container = get_cosmos_container()
     partition_key = get_config("PartitionKey")
     partition_key = partition_key
-    query = f"SELECT * FROM c WHERE c.partitionKey = '{partition_key}' AND c.documentType = '{document_type}'"
+    query = f"SELECT * FROM c WHERE c.partitionKey = '{partition_key}' AND c.documentType = '{document_type}' AND StringToNumber(StringSplit(c.id, '_')[1]) >= {starting_at}"
     items = cosmos_container.query_items(query=query, enable_cross_partition_query=False)
     deleted_count = 0
     for item in items:
@@ -352,7 +352,7 @@ def overlap_and_upload_chunks(cosmos_container, chunk_accumulator, overlap_size,
 
 def main():
     try:
-        opts, _ = getopt.getopt(sys.argv[1:], "rfdt:", ['upload-final-ruling', 'upload-fact-sheet', 'delete-document-type', 'document-type'])
+        opts, _ = getopt.getopt(sys.argv[1:], "rfdt:i:", ['upload-final-ruling', 'upload-fact-sheet', 'delete-document-type', 'document-type', 'starting-at'])
     except getopt.GetoptError:
         print_help()
         sys.exit(2)
@@ -372,7 +372,9 @@ def main():
     delete_document = get_flag(opts, '-d')
     if delete_document:
         document_type = get_value(opts, '-t')
-        delete_document_type(document_type)
+        starting_at = get_value(opts, '-i')
+        parsed_starting_at = int(starting_at) if starting_at else 0 
+        delete_document_type(document_type, parsed_starting_at)
 
 def requesting_help(opts):
     help = next((o for o in opts if len(o) > 0 and o[0] == '-h'), None)
