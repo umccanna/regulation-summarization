@@ -1,9 +1,9 @@
 param(
     [switch]$Recreate,
-    [string]$PythonVersion = "3.11"
+    [string]$AdditionalTrustedRootCAThumbprint = "d72f47d87420e3f0f9bdcac6f03a566743c481b9"
 )
 
-$python = "python$PythonVersion"
+$python = "python"
 if (-Not (Test-Path .venv)) {
     Write-Host "Creating Virtual Environment"
     & $python -m venv .venv
@@ -18,16 +18,35 @@ if (-Not (Test-Path .venv)) {
     }
 }
 
+if (-Not ("" -eq $AdditionalTrustedRootCAThumbprint)) {
+    Write-Host "Configuring additional trusted root CA..."
+    $CACert = Get-ChildItem -Path "Cert:\LocalMachine\Root" | Where-Object { $_.Thumbprint -eq $AdditionalTrustedRootCAThumbprint }
+    if (-Not $CACert) {
+        Write-Warning "$AdditionalTrustedRootCAThumbprint thumbprint not found in 'Cert:\LocalMachine\Root' store"
+    } else {
+        $TempBinaryFile = New-TemporaryFile
+        Export-Certificate -Cert $CACert -FilePath $TempBinaryFile
+        $BinaryContent = [System.IO.File]::ReadAllBytes($TempBinaryFile)
+        $Base64Cert = [System.Convert]::ToBase64String($BinaryContent)
+        $CACertPemPath = "$PSSCriptRoot/.venv/Lib/site-packages/certifi/cacert.pem"
+        if (-Not (Test-Path $CACertPemPath)) {
+            Write-Warning "Unable to update trusted root CA. $CACertPemPath not found"
+        } else {
+            $CACertContent = [System.IO.File]::ReadAllText($CACertPemPath)
+            if ($CACertContent.Contains($Base64Cert)) {
+                Write-Host "$CACertPemPath already contains the requested root CA cert"
+            } else {
+                Add-Content -Path $CACertPemPath -Value "-----BEGIN CERTIFICATE-----" -Encoding "utf8"
+                Add-Content -Path $CACertPemPath -Value $Base64Cert -Encoding "utf8"
+                Add-Content -Path $CACertPemPath -Value "-----END CERTIFICATE-----" -Encoding "utf8"
+                Write-Host "$CACertPemPath updated with $AdditionalTrustedRootCAThumbprint"
+            }
+        }
+    }    
+}
+
 Write-Host "Activating Environemnt"
 & .venv/Scripts/activate.ps1
-
-$environmentPythonVersion = & python --version
-
-if (-Not ($environmentPythonVersion.StartsWith("Python $PythonVersion"))) {
-    & deactivate
-    Write-Warning "Python Version required for functions is $PythonVersion.x found $environmentPythonVersion.  Please ensure you have $PythonVersion.x installed on your machine"
-    return
-}
 
 if (Test-Path "requirements.txt") {
     Write-Host "Installing Dependencies"
